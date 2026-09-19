@@ -157,4 +157,255 @@ class MoneyAgent:
             )
         )
 
-        resultado = self.executor.execut
+        resultado = self.executor.executar(
+            decisao
+        )
+
+        self.registrar(
+            "EXECUTOR",
+            f"Resultado: {resultado}"
+        )
+
+        return resultado
+
+    def medir(self, resultado_execucao):
+
+        self.registrar(
+            "MEDIR",
+            "Medindo o resultado da execução."
+        )
+
+        if not isinstance(
+            resultado_execucao,
+            dict
+        ):
+
+            return {
+                "receita": 0,
+                "custo": 0,
+                "resultado": 0,
+                "status": "erro"
+            }
+
+        receita = resultado_execucao.get(
+            "receita",
+            0
+        )
+
+        custo = resultado_execucao.get(
+            "custo_real",
+            resultado_execucao.get(
+                "custo",
+                0
+            )
+        )
+
+        resultado = resultado_execucao.get(
+            "resultado",
+            receita - custo
+        )
+
+        return {
+            "receita": receita,
+            "custo": custo,
+            "resultado": resultado,
+            "status": resultado_execucao.get(
+                "status"
+            )
+        }
+
+    def aprender(
+        self,
+        estrategia,
+        resultado_execucao,
+        medicao
+    ):
+
+        self.registrar(
+            "APRENDER",
+            "Registrando o resultado para ciclos futuros."
+        )
+
+        if estrategia:
+
+            registrar_resultado(
+                estrategia,
+                receita=medicao["receita"],
+                custo=medicao["custo"],
+                resultado=medicao["resultado"]
+            )
+
+        else:
+
+            registrar_resultado(
+                "Ciclo da Money AI",
+                receita=medicao["receita"],
+                custo=medicao["custo"],
+                resultado=medicao["resultado"]
+            )
+
+        if estrategia:
+
+            registrar_aprendizado(
+                aprendizado=(
+                    "O teste foi executado e seu resultado "
+                    "foi registrado para comparação futura."
+                ),
+                estrategia=estrategia,
+                evidencias=[
+                    {
+                        "status": resultado_execucao.get(
+                            "status"
+                        ),
+                        "receita": medicao["receita"],
+                        "custo": medicao["custo"],
+                        "resultado": medicao["resultado"]
+                    }
+                ],
+                impacto=(
+                    "Aguardar resultados reais de novos "
+                    "testes antes de alterar a estratégia."
+                )
+            )
+
+    def ciclo_agente(self):
+
+        self.ciclo += 1
+
+        self.registrar(
+            "CICLO",
+            f"Iniciando ciclo {self.ciclo}."
+        )
+
+        dados = self.observar()
+
+        analise = self.analisar(
+            dados
+        )
+
+        decisao = self.decidir(
+            analise
+        )
+
+        estrategia = decisao.get(
+            "estrategia"
+        )
+
+        if estrategia:
+
+            registrar_estrategia(
+                nome=estrategia,
+                descricao=(
+                    "Estratégia identificada pelo "
+                    "Cérebro durante o ciclo."
+                ),
+                status="em_teste"
+            )
+
+        resultado_execucao = self.executar(
+            decisao
+        )
+
+        resultado = self.medir(
+            resultado_execucao
+        )
+
+        registrar_teste(
+            estrategia=estrategia or "Nenhuma estratégia",
+            plano=resultado_execucao,
+            restricoes=resultado_execucao.get(
+                "restricoes",
+                {}
+            )
+            if isinstance(
+                resultado_execucao,
+                dict
+            )
+            else {},
+            execucao=resultado_execucao,
+            receita=resultado["receita"],
+            custo=resultado["custo"],
+            resultado=resultado["resultado"],
+            status=resultado["status"],
+            ciclo=self.ciclo
+        )
+
+        self.aprender(
+            estrategia,
+            resultado_execucao,
+            resultado
+        )
+
+        registrar_ciclo(
+            objetivo=self.objetivo,
+            localizacao=self.localizacao,
+            pesquisa=dados,
+            analise=analise,
+            decisao=decisao,
+            execucao=resultado_execucao,
+            medicao=resultado
+        )
+
+        self.registrar(
+            "CICLO",
+            f"Ciclo {self.ciclo} concluído."
+        )
+
+        return {
+            "ciclo": self.ciclo,
+            "observacao": dados,
+            "analise": analise,
+            "decisao": decisao,
+            "execucao": resultado_execucao,
+            "medicao": resultado
+        }
+
+    def iniciar(self, intervalo=60):
+
+        self.ativo = True
+
+        self.registrar(
+            "SISTEMA",
+            "Money AI iniciada."
+        )
+
+        while self.ativo:
+
+            try:
+
+                self.ciclo_agente()
+
+                time.sleep(
+                    intervalo
+                )
+
+            except Exception as erro:
+
+                self.registrar(
+                    "ERRO",
+                    str(erro)
+                )
+
+                time.sleep(
+                    intervalo
+                )
+
+    def parar(self):
+
+        self.ativo = False
+
+        self.registrar(
+            "SISTEMA",
+            "Money AI parada."
+        )
+
+
+if __name__ == "__main__":
+
+    agente = MoneyAgent(
+        objetivo="Encontrar uma oportunidade de negócio"
+    )
+
+    resultado = agente.ciclo_agente()
+
+    print(resultado)
