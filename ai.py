@@ -1,81 +1,89 @@
+import os
 import time
+import requests
 from google import genai
-from google.genai import types
 
 client = genai.Client()
 
-grounding_tool = types.Tool(
-    google_search=types.GoogleSearch()
-)
+TINYFISH_API_KEY = os.getenv("TINYFISH_API_KEY")
 
-config = types.GenerateContentConfig(
-    tools=[grounding_tool]
-)
+
+def pesquisar_web(objetivo):
+    if not TINYFISH_API_KEY:
+        return {
+            "erro": "TINYFISH_API_KEY não configurada."
+        }
+
+    params = {
+        "query": objetivo,
+        "location": "BR",
+        "language": "pt",
+        "domain_type": "web"
+    }
+
+    headers = {
+        "X-API-Key": TINYFISH_API_KEY
+    }
+
+    try:
+        resposta = requests.get(
+            "https://api.search.tinyfish.ai",
+            params=params,
+            headers=headers,
+            timeout=30
+        )
+
+        if resposta.status_code != 200:
+            return {
+                "erro": f"TinyFish HTTP {resposta.status_code}: {resposta.text}"
+            }
+
+        dados = resposta.json()
+
+        resultados = []
+
+        for item in dados.get("results", [])[:8]:
+            resultados.append({
+                "titulo": item.get("title"),
+                "site": item.get("site_name"),
+                "resumo": item.get("snippet"),
+                "url": item.get("url")
+            })
+
+        return {
+            "resultados": resultados
+        }
+
+    except Exception as erro:
+        return {
+            "erro": str(erro)
+        }
 
 
 def analisar_oportunidade(objetivo):
-    prompt = f"""
-Você é a Money AI, uma IA especializada em encontrar
-e analisar oportunidades legítimas de renda pela internet.
 
-OBJETIVO DO USUÁRIO:
-{objetivo}
+    pesquisa = pesquisar_web(
+        f"{objetivo} oportunidades legítimas atuais Brasil"
+    )
 
-Pesquise na internet informações atuais relacionadas ao objetivo.
+    if "erro" in pesquisa:
+        return {
+            "objetivo": objetivo,
+            "erro": pesquisa["erro"],
+            "status": "erro"
+        }
 
-Verifique, quando necessário:
-- plataformas disponíveis atualmente;
-- oportunidades reais;
-- preços e custos;
-- requisitos;
-- formas de monetização;
-- mudanças recentes;
-- riscos e limitações.
+    fontes = pesquisa.get("resultados", [])
 
-Para cada oportunidade relevante, informe:
-1. O que é.
-2. Como funciona.
-3. Custo inicial.
-4. Requisitos.
-5. Como ganhar dinheiro.
-6. Dificuldade.
-7. Possibilidade de automação.
-8. Riscos.
-9. Primeiros passos.
+    contexto_web = ""
 
-Priorize oportunidades que possam ser testadas com pouco dinheiro.
-
-Não prometa ganhos garantidos.
-Não invente dados.
-Diferencie fatos encontrados na pesquisa de estimativas.
-
-Inclua as fontes utilizadas quando houver informações
-importantes baseadas na internet.
+    for i, fonte in enumerate(fontes, 1):
+        contexto_web += f"""
+Fonte {i}
+Título: {fonte.get('titulo')}
+Site: {fonte.get('site')}
+Resumo: {fonte.get('resumo')}
+URL: {fonte.get('url')}
 """
 
-    for tentativa in range(3):
-        try:
-            response = client.models.generate_content(
-                model="gemini-3.1-flash-lite",
-                contents=prompt,
-                config=config
-            )
-
-            return {
-                "objetivo": objetivo,
-                "analise": response.text,
-                "status": "sucesso"
-            }
-
-        except Exception as erro:
-            erro_texto = str(erro)
-
-            if "503" in erro_texto and tentativa < 2:
-                time.sleep(3)
-                continue
-
-            return {
-                "objetivo": objetivo,
-                "erro": erro_texto,
-                "status": "erro"
-            }
+    prompt = f"""
