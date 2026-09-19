@@ -1,7 +1,11 @@
 from flask import Flask, request, jsonify, render_template_string
+
 from ai import analisar_oportunidade
+from agente import MoneyAgent
+
 
 app = Flask(__name__)
+
 
 HTML = """
 <!DOCTYPE html>
@@ -49,14 +53,14 @@ HTML = """
 
     <h1>Money AI</h1>
 
-    <p>O que você quer alcançar?</p>
+    <p>Objetivo da Money AI:</p>
 
     <textarea
         id="objetivo"
-        placeholder="Ex.: Quero ganhar R$ 200 esta semana sem aparecer."
+        placeholder="Ex.: Encontrar uma oportunidade de negócio"
     ></textarea>
 
-    <p>Em qual cidade e estado você está?</p>
+    <p>Localização:</p>
 
     <input
         id="localizacao"
@@ -66,12 +70,15 @@ HTML = """
 
     <br>
 
-    <button onclick="analisar()">Encontrar oportunidades</button>
+    <button onclick="executarCiclo()">
+        Executar ciclo da Money AI
+    </button>
 
     <div id="resultado"></div>
 
     <script>
-        async function analisar() {
+
+        async function executarCiclo() {
 
             const objetivo =
                 document.getElementById("objetivo").value;
@@ -83,57 +90,60 @@ HTML = """
                 document.getElementById("resultado");
 
             if (!objetivo.trim()) {
+
                 resultado.textContent =
-                    "Digite o que você quer alcançar.";
+                    "Digite um objetivo.";
+
                 return;
             }
 
             if (!localizacao.trim()) {
+
                 resultado.textContent =
-                    "Informe sua cidade e estado.";
+                    "Informe a localização.";
+
                 return;
             }
 
             resultado.textContent =
-                "Pesquisando oportunidades próximas e online...";
+                "Money AI executando ciclo...";
 
             try {
 
-                const resposta = await fetch("/analisar", {
-                    method: "POST",
+                const resposta = await fetch(
+                    "/ciclo",
+                    {
+                        method: "POST",
 
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
 
-                    body: JSON.stringify({
-                        objetivo: objetivo,
-                        localizacao: localizacao
-                    })
-                });
+                        body: JSON.stringify({
+                            objetivo: objetivo,
+                            localizacao: localizacao
+                        })
+                    }
+                );
 
-                const dados = await resposta.json();
+                const dados =
+                    await resposta.json();
 
-                if (dados.analise) {
-
-                    resultado.textContent =
-                        dados.analise;
-
-                } else {
-
-                    resultado.textContent =
-                        "Erro: " +
-                        (dados.erro || "resposta inesperada");
-
-                }
+                resultado.textContent =
+                    JSON.stringify(
+                        dados,
+                        null,
+                        2
+                    );
 
             } catch (erro) {
 
                 resultado.textContent =
-                    "Erro de conexão: " + erro;
+                    "Erro: " + erro;
 
             }
         }
+
     </script>
 
 </body>
@@ -143,23 +153,70 @@ HTML = """
 
 @app.route("/")
 def home():
-    return render_template_string(HTML)
+
+    return render_template_string(
+        HTML
+    )
+
+
+@app.route("/ciclo", methods=["POST"])
+def ciclo():
+
+    dados = request.get_json(
+        silent=True
+    ) or {}
+
+    objetivo = dados.get(
+        "objetivo",
+        "Gerar receita"
+    ).strip()
+
+    localizacao = dados.get(
+        "localizacao",
+        "BR"
+    ).strip()
+
+    agente = MoneyAgent(
+        objetivo=objetivo
+    )
+
+    agente.localizacao = localizacao
+
+    agente.ciclo_agente()
+
+    return jsonify({
+        "status": "ciclo_executado",
+        "ciclo": agente.ciclo,
+        "objetivo": objetivo,
+        "localizacao": localizacao
+    })
 
 
 @app.route("/analisar", methods=["POST"])
 def analisar():
 
-    dados = request.get_json(silent=True) or {}
+    dados = request.get_json(
+        silent=True
+    ) or {}
 
-    objetivo = dados.get("objetivo", "").strip()
-    localizacao = dados.get("localizacao", "").strip()
+    objetivo = dados.get(
+        "objetivo",
+        ""
+    ).strip()
+
+    localizacao = dados.get(
+        "localizacao",
+        ""
+    ).strip()
 
     if not objetivo:
+
         return jsonify({
             "erro": "Informe um objetivo."
         }), 400
 
     if not localizacao:
+
         return jsonify({
             "erro": "Informe sua cidade e estado."
         }), 400
@@ -173,6 +230,7 @@ def analisar():
 
 
 if __name__ == "__main__":
+
     app.run(
         host="0.0.0.0",
         port=5000
