@@ -1,592 +1,278 @@
-import re
-import time
-
-from ai import analisar_oportunidade
-
 from memory import (
-    registrar_evento,
-    registrar_resultado,
-    registrar_estrategia,
     registrar_ciclo,
-    registrar_teste,
+    registrar_resultado,
     registrar_aprendizado
 )
-
-from executor import Executor
 
 
 class MoneyAgent:
 
-    def __init__(self, objetivo="Gerar receita"):
-
-        self.ativo = False
+    def __init__(self):
         self.ciclo = 0
-        self.objetivo = objetivo
-        self.localizacao = "BR"
-        self.executor = Executor()
 
-    def registrar(self, tipo, mensagem):
-
-        registrar_evento(
-            tipo,
-            mensagem
-        )
-
-        print(
-            f"[{tipo}] {mensagem}"
-        )
-
-    def observar(self):
-
-        self.registrar(
-            "OBSERVAR",
-            "Coletando informações para o próximo ciclo."
-        )
-
-        return {
-            "objetivo": self.objetivo,
-            "localizacao": self.localizacao,
-            "ciclo": self.ciclo
-        }
-
-    def analisar(self, dados):
-
-        self.registrar(
-            "ANALISAR",
-            "Enviando informações ao Cérebro."
-        )
-
-        analise = analisar_oportunidade(
-            dados["objetivo"],
-            dados["localizacao"]
-        )
-
-        return analise
-
-    def extrair_estrategia(self, analise):
-
-        if not isinstance(analise, dict):
-            return None
-
-        # 1. Se o Cérebro já entregar a estratégia
-        # estruturada, usamos diretamente.
-        estrategia = analise.get(
-            "estrategia"
-        )
-
-        if estrategia:
-            return estrategia.strip()
-
-        texto = analise.get(
-            "analise",
-            ""
-        )
-
-        if not isinstance(texto, str):
-            return None
-
-        # -------------------------------------------------
-        # 2. Procurar a decisão explícita do Cérebro.
-        #
-        # Exemplo:
-        #
-        # "A Money AI deve selecionar a Oportunidade 2
-        # (Automação de Soluções com IA para PMEs)..."
-        # -------------------------------------------------
-
-        padroes_selecao = [
-
-            r"selecionar\s+a\s+Oportunidade\s*(\d+)",
-            r"selecionar\s+a\s+oportunidade\s*(\d+)",
-
-            r"escolher\s+a\s+Oportunidade\s*(\d+)",
-            r"escolher\s+a\s+oportunidade\s*(\d+)",
-
-            r"escolhida\s+a\s+Oportunidade\s*(\d+)",
-            r"escolhida\s+a\s+oportunidade\s*(\d+)",
-
-            r"escolhendo\s+a\s+Oportunidade\s*(\d+)",
-            r"escolhendo\s+a\s+oportunidade\s*(\d+)",
-
-            r"selecionada\s+a\s+Oportunidade\s*(\d+)",
-            r"selecionada\s+a\s+oportunidade\s*(\d+)"
-        ]
-
-        numero_oportunidade = None
-
-        for padrao in padroes_selecao:
-
-            encontrado = re.search(
-                padrao,
-                texto,
-                re.IGNORECASE
-            )
-
-            if encontrado:
-
-                numero_oportunidade = int(
-                    encontrado.group(1)
-                )
-
-                break
-
-        # -------------------------------------------------
-        # 3. Se encontrou a oportunidade escolhida,
-        # procurar o título correspondente.
-        # -------------------------------------------------
-
-        if numero_oportunidade is not None:
-
-            padrao_oportunidade = (
-                rf"Oportunidade\s*"
-                rf"{numero_oportunidade}"
-                rf"\s*[:\-–—]\s*(.+)"
-            )
-
-            encontrado = re.search(
-                padrao_oportunidade,
-                texto,
-                re.IGNORECASE
-            )
-
-            if encontrado:
-
-                estrategia = encontrado.group(
-                    1
-                ).strip()
-
-                estrategia = estrategia.split(
-                    "\n",
-                    1
-                )[0].strip()
-
-                estrategia = estrategia.rstrip(
-                    "."
-                )
-
-                if estrategia:
-
-                    return estrategia[:200]
-
-        # -------------------------------------------------
-        # 4. Tentar pegar diretamente o nome que aparece
-        # entre parênteses na decisão.
-        #
-        # Exemplo:
-        # Oportunidade 2
-        # (Automação de Soluções com IA para PMEs)
-        # -------------------------------------------------
-
-        if numero_oportunidade is not None:
-
-            padrao_parenteses = (
-                rf"Oportunidade\s*"
-                rf"{numero_oportunidade}"
-                rf"\s*\(([^)]+)\)"
-            )
-
-            encontrado = re.search(
-                padrao_parenteses,
-                texto,
-                re.IGNORECASE
-            )
-
-            if encontrado:
-
-                estrategia = encontrado.group(
-                    1
-                ).strip()
-
-                if estrategia:
-
-                    return estrategia[:200]
-
-        # -------------------------------------------------
-        # 5. Se houver uma estratégia estruturada em texto,
-        # tentar identificá-la.
-        # -------------------------------------------------
-
-        padroes_estrategia = [
-            r"Estratégia\s*:\s*(.+)",
-            r"Estrategia\s*:\s*(.+)"
-        ]
-
-        for padrao in padroes_estrategia:
-
-            encontrado = re.search(
-                padrao,
-                texto,
-                re.IGNORECASE
-            )
-
-            if encontrado:
-
-                estrategia = encontrado.group(
-                    1
-                ).strip()
-
-                estrategia = estrategia.split(
-                    "\n",
-                    1
-                )[0].strip()
-
-                estrategia = estrategia.rstrip(
-                    "."
-                )
-
-                if estrategia:
-
-                    return estrategia[:200]
-
-        # -------------------------------------------------
-        # 6. Último recurso:
-        # procurar Oportunidade 1.
-        #
-        # Isso só acontece se o Cérebro não tiver informado
-        # explicitamente uma escolha.
-        # -------------------------------------------------
-
-        padrao_primeira = (
-            r"Oportunidade\s*1\s*[:\-–—]\s*(.+)"
-        )
-
-        encontrado = re.search(
-            padrao_primeira,
-            texto,
-            re.IGNORECASE
-        )
-
-        if encontrado:
-
-            estrategia = encontrado.group(
-                1
-            ).strip()
-
-            estrategia = estrategia.split(
-                "\n",
-                1
-            )[0].strip()
-
-            estrategia = estrategia.rstrip(
-                "."
-            )
-
-            if estrategia:
-
-                return estrategia[:200]
-
-        return None
-
-    def decidir(self, analise):
-
-        self.registrar(
-            "DECIDIR",
-            "Definindo a próxima ação."
-        )
-
-        if not isinstance(analise, dict):
-
-            return {
-                "acao": "aguardar",
-                "motivo": "Análise inválida.",
-                "analise": analise
-            }
-
-        if analise.get("status") != "sucesso":
-
-            return {
-                "acao": "aguardar",
-                "motivo": (
-                    "Não foi possível concluir a análise."
-                ),
-                "analise": analise
-            }
-
-        estrategia = self.extrair_estrategia(
-            analise
-        )
-
-        if not estrategia:
-
-            return {
-                "acao": "aguardar",
-                "motivo": (
-                    "O Cérebro não informou uma "
-                    "estratégia identificável."
-                ),
-                "analise": analise
-            }
-
-        return {
-            "acao": "testar_estrategia",
-            "motivo": (
-                "Estratégia selecionada pelo Cérebro."
-            ),
-            "estrategia": estrategia,
-            "analise": analise
-        }
-
-    def executar(self, decisao):
-
-        self.registrar(
-            "EXECUTAR",
-            (
-                "Enviando decisão ao Executor: "
-                f"{decisao.get('acao')}"
-            )
-        )
-
-        resultado = self.executor.executar(
-            decisao
-        )
-
-        self.registrar(
-            "EXECUTOR",
-            f"Resultado: {resultado}"
-        )
-
-        return resultado
-
-    def medir(self, resultado_execucao):
-
-        self.registrar(
-            "MEDIR",
-            "Medindo o resultado da execução."
-        )
-
-        if not isinstance(
-            resultado_execucao,
-            dict
-        ):
-
-            return {
-                "receita": 0,
-                "custo": 0,
-                "resultado": 0,
-                "status": "erro"
-            }
-
-        receita = resultado_execucao.get(
-            "receita",
-            0
-        )
-
-        custo = resultado_execucao.get(
-            "custo_real",
-            resultado_execucao.get(
-                "custo",
-                0
-            )
-        )
-
-        resultado = resultado_execucao.get(
-            "resultado",
-            receita - custo
-        )
-
-        return {
-            "receita": receita,
-            "custo": custo,
-            "resultado": resultado,
-            "status": resultado_execucao.get(
-                "status"
-            )
-        }
-
-    def aprender(
+    def ciclo_agente(
         self,
-        estrategia,
-        resultado_execucao,
-        medicao
+        objetivo="Encontrar oportunidade de ganho de dinheiro online",
+        localizacao="Brasil"
     ):
 
-        self.registrar(
-            "APRENDER",
-            "Registrando o resultado para ciclos futuros."
-        )
-
-        nome_estrategia = (
-            estrategia
-            if estrategia
-            else "Ciclo da Money AI"
-        )
-
-        registrar_resultado(
-            nome_estrategia,
-            receita=medicao["receita"],
-            custo=medicao["custo"],
-            resultado=medicao["resultado"]
-        )
-
-        if estrategia:
-
-            registrar_aprendizado(
-                aprendizado=(
-                    "O teste foi executado e seu resultado "
-                    "foi registrado para comparação futura."
-                ),
-                estrategia=estrategia,
-                evidencias=[
-                    {
-                        "status": resultado_execucao.get(
-                            "status"
-                        ),
-                        "receita": medicao["receita"],
-                        "custo": medicao["custo"],
-                        "resultado": medicao["resultado"]
-                    }
-                ],
-                impacto=(
-                    "Aguardar resultados reais de novos "
-                    "testes antes de alterar a estratégia."
-                )
-            )
-
-    def ciclo_agente(self):
+        # Imports locais para evitar import circular
+        from ai import analisar_oportunidade
+        from executor import executar
 
         self.ciclo += 1
 
-        self.registrar(
-            "CICLO",
-            f"Iniciando ciclo {self.ciclo}."
+        # 1. Cérebro pesquisa e analisa
+        analise = analisar_oportunidade(
+            objetivo,
+            localizacao
         )
 
-        dados = self.observar()
+        # 2. Verifica erro
+        if analise.get("status") == "erro":
 
-        analise = self.analisar(
-            dados
+            medicao = {
+                "status": "erro",
+                "receita": 0,
+                "custo": 0,
+                "resultado": 0
+            }
+
+            ciclo = registrar_ciclo(
+                objetivo=objetivo,
+                localizacao=localizacao,
+                pesquisa=analise,
+                analise=analise,
+                decisao=None,
+                execucao=None,
+                medicao=medicao
+            )
+
+            return {
+                "status": "erro",
+                "ciclo": self.ciclo,
+                "erro": analise.get("erro"),
+                "ciclo_memoria": ciclo
+            }
+
+        # 3. Extrai decisão estruturada
+        decisao_ia = analise.get(
+            "decisao",
+            {}
         )
 
-        decisao = self.decidir(
-            analise
-        )
+        if not isinstance(decisao_ia, dict):
+            decisao_ia = {}
 
-        estrategia = decisao.get(
+        estrategia = decisao_ia.get(
             "estrategia"
         )
 
-        if estrategia:
+        nicho = decisao_ia.get(
+            "nicho"
+        )
 
-            registrar_estrategia(
-                nome=estrategia,
-                descricao=(
-                    "Estratégia selecionada pelo "
-                    "Cérebro durante o ciclo."
+        cliente_alvo = decisao_ia.get(
+            "cliente_alvo"
+        )
+
+        problema = decisao_ia.get(
+            "problema"
+        )
+
+        oferta = decisao_ia.get(
+            "oferta"
+        )
+
+        canal = decisao_ia.get(
+            "canal"
+        )
+
+        acao_imediata = decisao_ia.get(
+            "acao_imediata"
+        )
+
+        precisa_permissao = decisao_ia.get(
+            "precisa_permissao",
+            False
+        )
+
+        # 4. Sem estratégia válida
+        if not estrategia:
+
+            decisao = {
+                "acao": "pesquisar",
+                "motivo": (
+                    "O Cérebro não informou uma "
+                    "estratégia válida. Será feita "
+                    "pesquisa adicional."
                 ),
-                status="em_teste"
+                "consulta": objetivo,
+                "analise": analise
+            }
+
+        # 5. Próxima ação exige permissão
+        elif precisa_permissao:
+
+            consulta = (
+                f"Pesquise oportunidades reais "
+                f"relacionadas à estratégia: "
+                f"{estrategia}. "
+                f"Nicho: {nicho}. "
+                f"Canal: {canal}. "
+                f"Problema: {problema}. "
+                f"Oferta: {oferta}. "
+                f"Procure demanda atual, "
+                f"concorrentes, preços e "
+                f"oportunidades concretas no Brasil. "
+                f"Não criar contas, não enviar "
+                f"mensagens e não gastar dinheiro."
             )
 
-        resultado_execucao = self.executar(
+            decisao = {
+                "acao": "pesquisar",
+                "estrategia": estrategia,
+                "nicho": nicho,
+                "cliente_alvo": cliente_alvo,
+                "problema": problema,
+                "oferta": oferta,
+                "canal": canal,
+                "acao_imediata": acao_imediata,
+                "precisa_permissao": True,
+                "consulta": consulta,
+                "motivo": (
+                    "A próxima ação externa exige "
+                    "permissão. A Money AI fará "
+                    "primeiro uma etapa preparatória "
+                    "sem custo."
+                )
+            }
+
+        # 6. Ação segura
+        else:
+
+            decisao = {
+                "acao": "pesquisar",
+                "estrategia": estrategia,
+                "nicho": nicho,
+                "cliente_alvo": cliente_alvo,
+                "problema": problema,
+                "oferta": oferta,
+                "canal": canal,
+                "acao_imediata": acao_imediata,
+                "precisa_permissao": False,
+                "consulta": (
+                    f"{estrategia}. "
+                    f"Pesquise demanda, clientes, "
+                    f"concorrência e preços atuais."
+                )
+            }
+
+        # 7. Executa
+        execucao = executar(
             decisao
         )
 
-        resultado = self.medir(
-            resultado_execucao
+        # 8. Mede resultado
+        receita = 0
+        custo = 0
+
+        if isinstance(execucao, dict):
+
+            receita = (
+                execucao.get(
+                    "receita",
+                    0
+                ) or 0
+            )
+
+            custo = (
+                execucao.get(
+                    "custo",
+                    0
+                ) or 0
+            )
+
+        resultado_financeiro = (
+            receita - custo
         )
 
-        registrar_teste(
-            estrategia=(
-                estrategia
-                or "Nenhuma estratégia"
-            ),
-            plano=resultado_execucao,
-            restricoes=(
-                resultado_execucao.get(
-                    "restricoes",
-                    {}
+        medicao = {
+            "receita": receita,
+            "custo": custo,
+            "resultado": resultado_financeiro,
+            "status": (
+                execucao.get(
+                    "status",
+                    "desconhecido"
                 )
                 if isinstance(
-                    resultado_execucao,
+                    execucao,
                     dict
                 )
-                else {}
+                else "desconhecido"
+            )
+        }
+
+        # 9. Registra resultado
+        if estrategia:
+
+            registrar_resultado(
+                estrategia=estrategia,
+                receita=receita,
+                custo=custo,
+                resultado=resultado_financeiro
+            )
+
+            # 10. Registra aprendizado
+            registrar_aprendizado(
+                aprendizado=(
+                    "A Money AI executou uma "
+                    "etapa do teste da estratégia "
+                    f"'{estrategia}'."
+                ),
+                estrategia=estrategia,
+                evidencias=[
+                    execucao
+                ],
+                impacto=(
+                    "Resultado financeiro: "
+                    f"R${resultado_financeiro:.2f}"
+                )
+            )
+
+        # 11. Salva ciclo completo
+        ciclo = registrar_ciclo(
+            objetivo=objetivo,
+            localizacao=localizacao,
+            pesquisa=analise.get(
+                "fontes_brutas"
             ),
-            execucao=resultado_execucao,
-            receita=resultado["receita"],
-            custo=resultado["custo"],
-            resultado=resultado["resultado"],
-            status=resultado["status"],
-            ciclo=self.ciclo
-        )
-
-        self.aprender(
-            estrategia,
-            resultado_execucao,
-            resultado
-        )
-
-        registrar_ciclo(
-            objetivo=self.objetivo,
-            localizacao=self.localizacao,
-            pesquisa=dados,
             analise=analise,
             decisao=decisao,
-            execucao=resultado_execucao,
-            medicao=resultado
-        )
-
-        self.registrar(
-            "CICLO",
-            f"Ciclo {self.ciclo} concluído."
+            execucao=execucao,
+            medicao=medicao
         )
 
         return {
+            "status": "sucesso",
             "ciclo": self.ciclo,
-            "observacao": dados,
-            "analise": analise,
+            "decisao_ia": analise,
             "decisao": decisao,
-            "execucao": resultado_execucao,
-            "medicao": resultado
+            "execucao": execucao,
+            "medicao": medicao,
+            "ciclo_memoria": ciclo
         }
 
-    def iniciar(self, intervalo=60):
 
-        self.ativo = True
+def executar_ciclo(
+    objetivo="Encontrar oportunidade de ganho de dinheiro online",
+    localizacao="Brasil"
+):
 
-        self.registrar(
-            "SISTEMA",
-            "Money AI iniciada."
-        )
+    agente = MoneyAgent()
 
-        while self.ativo:
-
-            try:
-
-                self.ciclo_agente()
-
-                time.sleep(
-                    intervalo
-                )
-
-            except Exception as erro:
-
-                self.registrar(
-                    "ERRO",
-                    str(erro)
-                )
-
-                time.sleep(
-                    intervalo
-                )
-
-    def parar(self):
-
-        self.ativo = False
-
-        self.registrar(
-            "SISTEMA",
-            "Money AI parada."
-        )
-
-
-if __name__ == "__main__":
-
-    agente = MoneyAgent(
-        objetivo=(
-            "Encontrar uma oportunidade de negócio"
-        )
+    return agente.ciclo_agente(
+        objetivo,
+        localizacao
     )
-
-    resultado = agente.ciclo_agente()
-
-    print(resultado)
