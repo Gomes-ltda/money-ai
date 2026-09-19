@@ -7,20 +7,28 @@ from memory import (
 
 class MoneyAgent:
 
-    def __init__(self):
-        self.ciclo = 0
-
-    def ciclo_agente(
+    def __init__(
         self,
         objetivo="Encontrar oportunidade de ganho de dinheiro online",
         localizacao="Brasil"
     ):
+        self.objetivo = objetivo
+        self.localizacao = localizacao
+        self.ciclo = 0
 
-        # Imports locais para evitar import circular
+    def ciclo_agente(
+        self,
+        objetivo=None,
+        localizacao=None
+    ):
+
         from ai import analisar_oportunidade
         from executor import executar
 
         self.ciclo += 1
+
+        objetivo = objetivo or self.objetivo
+        localizacao = localizacao or self.localizacao
 
         # 1. Cérebro pesquisa e analisa
         analise = analisar_oportunidade(
@@ -224,7 +232,6 @@ class MoneyAgent:
                 resultado=resultado_financeiro
             )
 
-            # 10. Registra aprendizado
             registrar_aprendizado(
                 aprendizado=(
                     "A Money AI executou uma "
@@ -241,7 +248,7 @@ class MoneyAgent:
                 )
             )
 
-        # 11. Salva ciclo completo
+        # 10. Salva ciclo
         ciclo = registrar_ciclo(
             objetivo=objetivo,
             localizacao=localizacao,
@@ -270,9 +277,9 @@ def executar_ciclo(
     localizacao="Brasil"
 ):
 
-    agente = MoneyAgent()
-
-    return agente.ciclo_agente(
-        objetivo,
-        localizacao
+    agente = MoneyAgent(
+        objetivo=objetivo,
+        localizacao=localizacao
     )
+
+    return agente.ciclo_agente()
