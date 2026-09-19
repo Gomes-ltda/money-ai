@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template_string
 
 from ai import analisar_oportunidade
-from agente import MoneyAgent
+from agent import MoneyAgent
 
 
 app = Flask(__name__)
