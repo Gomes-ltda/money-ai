@@ -1,3 +1,4 @@
+import re
 import time
 
 from ai import analisar_oportunidade
@@ -67,12 +68,14 @@ class MoneyAgent:
         if not isinstance(analise, dict):
             return None
 
+        # 1. Se o Cérebro já entregar a estratégia
+        # estruturada, usamos diretamente.
         estrategia = analise.get(
             "estrategia"
         )
 
         if estrategia:
-            return estrategia
+            return estrategia.strip()
 
         texto = analise.get(
             "analise",
@@ -82,30 +85,195 @@ class MoneyAgent:
         if not isinstance(texto, str):
             return None
 
-        marcadores = [
-            "Oportunidade 1:",
-            "Oportunidade 1 -",
-            "Estratégia:"
+        # -------------------------------------------------
+        # 2. Procurar a decisão explícita do Cérebro.
+        #
+        # Exemplo:
+        #
+        # "A Money AI deve selecionar a Oportunidade 2
+        # (Automação de Soluções com IA para PMEs)..."
+        # -------------------------------------------------
+
+        padroes_selecao = [
+
+            r"selecionar\s+a\s+Oportunidade\s*(\d+)",
+            r"selecionar\s+a\s+oportunidade\s*(\d+)",
+
+            r"escolher\s+a\s+Oportunidade\s*(\d+)",
+            r"escolher\s+a\s+oportunidade\s*(\d+)",
+
+            r"escolhida\s+a\s+Oportunidade\s*(\d+)",
+            r"escolhida\s+a\s+oportunidade\s*(\d+)",
+
+            r"escolhendo\s+a\s+Oportunidade\s*(\d+)",
+            r"escolhendo\s+a\s+oportunidade\s*(\d+)",
+
+            r"selecionada\s+a\s+Oportunidade\s*(\d+)",
+            r"selecionada\s+a\s+oportunidade\s*(\d+)"
         ]
 
-        for marcador in marcadores:
+        numero_oportunidade = None
 
-            if marcador.lower() in texto.lower():
+        for padrao in padroes_selecao:
 
-                partes = texto.split(
-                    marcador,
-                    1
+            encontrado = re.search(
+                padrao,
+                texto,
+                re.IGNORECASE
+            )
+
+            if encontrado:
+
+                numero_oportunidade = int(
+                    encontrado.group(1)
                 )
 
-                if len(partes) == 2:
+                break
 
-                    estrategia = partes[1].split(
-                        "\n",
-                        1
-                    )[0].strip()
+        # -------------------------------------------------
+        # 3. Se encontrou a oportunidade escolhida,
+        # procurar o título correspondente.
+        # -------------------------------------------------
 
-                    if estrategia:
-                        return estrategia[:200]
+        if numero_oportunidade is not None:
+
+            padrao_oportunidade = (
+                rf"Oportunidade\s*"
+                rf"{numero_oportunidade}"
+                rf"\s*[:\-–—]\s*(.+)"
+            )
+
+            encontrado = re.search(
+                padrao_oportunidade,
+                texto,
+                re.IGNORECASE
+            )
+
+            if encontrado:
+
+                estrategia = encontrado.group(
+                    1
+                ).strip()
+
+                estrategia = estrategia.split(
+                    "\n",
+                    1
+                )[0].strip()
+
+                estrategia = estrategia.rstrip(
+                    "."
+                )
+
+                if estrategia:
+
+                    return estrategia[:200]
+
+        # -------------------------------------------------
+        # 4. Tentar pegar diretamente o nome que aparece
+        # entre parênteses na decisão.
+        #
+        # Exemplo:
+        # Oportunidade 2
+        # (Automação de Soluções com IA para PMEs)
+        # -------------------------------------------------
+
+        if numero_oportunidade is not None:
+
+            padrao_parenteses = (
+                rf"Oportunidade\s*"
+                rf"{numero_oportunidade}"
+                rf"\s*\(([^)]+)\)"
+            )
+
+            encontrado = re.search(
+                padrao_parenteses,
+                texto,
+                re.IGNORECASE
+            )
+
+            if encontrado:
+
+                estrategia = encontrado.group(
+                    1
+                ).strip()
+
+                if estrategia:
+
+                    return estrategia[:200]
+
+        # -------------------------------------------------
+        # 5. Se houver uma estratégia estruturada em texto,
+        # tentar identificá-la.
+        # -------------------------------------------------
+
+        padroes_estrategia = [
+            r"Estratégia\s*:\s*(.+)",
+            r"Estrategia\s*:\s*(.+)"
+        ]
+
+        for padrao in padroes_estrategia:
+
+            encontrado = re.search(
+                padrao,
+                texto,
+                re.IGNORECASE
+            )
+
+            if encontrado:
+
+                estrategia = encontrado.group(
+                    1
+                ).strip()
+
+                estrategia = estrategia.split(
+                    "\n",
+                    1
+                )[0].strip()
+
+                estrategia = estrategia.rstrip(
+                    "."
+                )
+
+                if estrategia:
+
+                    return estrategia[:200]
+
+        # -------------------------------------------------
+        # 6. Último recurso:
+        # procurar Oportunidade 1.
+        #
+        # Isso só acontece se o Cérebro não tiver informado
+        # explicitamente uma escolha.
+        # -------------------------------------------------
+
+        padrao_primeira = (
+            r"Oportunidade\s*1\s*[:\-–—]\s*(.+)"
+        )
+
+        encontrado = re.search(
+            padrao_primeira,
+            texto,
+            re.IGNORECASE
+        )
+
+        if encontrado:
+
+            estrategia = encontrado.group(
+                1
+            ).strip()
+
+            estrategia = estrategia.split(
+                "\n",
+                1
+            )[0].strip()
+
+            estrategia = estrategia.rstrip(
+                "."
+            )
+
+            if estrategia:
+
+                return estrategia[:200]
 
         return None
 
@@ -138,10 +306,21 @@ class MoneyAgent:
             analise
         )
 
+        if not estrategia:
+
+            return {
+                "acao": "aguardar",
+                "motivo": (
+                    "O Cérebro não informou uma "
+                    "estratégia identificável."
+                ),
+                "analise": analise
+            }
+
         return {
             "acao": "testar_estrategia",
             "motivo": (
-                "Estratégia identificada pelo Cérebro."
+                "Estratégia selecionada pelo Cérebro."
             ),
             "estrategia": estrategia,
             "analise": analise
@@ -226,23 +405,18 @@ class MoneyAgent:
             "Registrando o resultado para ciclos futuros."
         )
 
-        if estrategia:
+        nome_estrategia = (
+            estrategia
+            if estrategia
+            else "Ciclo da Money AI"
+        )
 
-            registrar_resultado(
-                estrategia,
-                receita=medicao["receita"],
-                custo=medicao["custo"],
-                resultado=medicao["resultado"]
-            )
-
-        else:
-
-            registrar_resultado(
-                "Ciclo da Money AI",
-                receita=medicao["receita"],
-                custo=medicao["custo"],
-                resultado=medicao["resultado"]
-            )
+        registrar_resultado(
+            nome_estrategia,
+            receita=medicao["receita"],
+            custo=medicao["custo"],
+            resultado=medicao["resultado"]
+        )
 
         if estrategia:
 
@@ -296,7 +470,7 @@ class MoneyAgent:
             registrar_estrategia(
                 nome=estrategia,
                 descricao=(
-                    "Estratégia identificada pelo "
+                    "Estratégia selecionada pelo "
                     "Cérebro durante o ciclo."
                 ),
                 status="em_teste"
@@ -311,17 +485,22 @@ class MoneyAgent:
         )
 
         registrar_teste(
-            estrategia=estrategia or "Nenhuma estratégia",
+            estrategia=(
+                estrategia
+                or "Nenhuma estratégia"
+            ),
             plano=resultado_execucao,
-            restricoes=resultado_execucao.get(
-                "restricoes",
-                {}
-            )
-            if isinstance(
-                resultado_execucao,
-                dict
-            )
-            else {},
+            restricoes=(
+                resultado_execucao.get(
+                    "restricoes",
+                    {}
+                )
+                if isinstance(
+                    resultado_execucao,
+                    dict
+                )
+                else {}
+            ),
             execucao=resultado_execucao,
             receita=resultado["receita"],
             custo=resultado["custo"],
@@ -403,7 +582,9 @@ class MoneyAgent:
 if __name__ == "__main__":
 
     agente = MoneyAgent(
-        objetivo="Encontrar uma oportunidade de negócio"
+        objetivo=(
+            "Encontrar uma oportunidade de negócio"
+        )
     )
 
     resultado = agente.ciclo_agente()
