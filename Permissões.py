@@ -6,11 +6,19 @@ ARQUIVO_PERMISSOES = "permissions.json"
 
 
 PERMISSOES_PADRAO = {
+    # Ações internas e seguras
     "pesquisar": True,
     "analisar": True,
+    "testar_estrategia": True,
+    "registrar_resultado": True,
+    "criar_tarefa": True,
     "criar_conteudo": True,
+
+    # Ações externas: bloqueadas inicialmente
     "publicar": False,
     "enviar_mensagens": False,
+
+    # Ações financeiras: bloqueadas inicialmente
     "gastar_dinheiro": False,
     "criar_contas": False,
     "movimentar_dinheiro": False
@@ -19,11 +27,13 @@ PERMISSOES_PADRAO = {
 
 def carregar_permissoes():
 
+    permissoes = PERMISSOES_PADRAO.copy()
+
     if not os.path.exists(ARQUIVO_PERMISSOES):
 
-        salvar_permissoes(PERMISSOES_PADRAO.copy())
+        salvar_permissoes(permissoes)
 
-        return PERMISSOES_PADRAO.copy()
+        return permissoes
 
     try:
 
@@ -33,11 +43,27 @@ def carregar_permissoes():
             encoding="utf-8"
         ) as arquivo:
 
-            return json.load(arquivo)
+            existentes = json.load(arquivo)
+
+        alterou = False
+
+        for acao, valor_padrao in PERMISSOES_PADRAO.items():
+
+            if acao not in existentes:
+
+                existentes[acao] = valor_padrao
+
+                alterou = True
+
+        if alterou:
+
+            salvar_permissoes(existentes)
+
+        return existentes
 
     except Exception:
 
-        return PERMISSOES_PADRAO.copy()
+        return permissoes
 
 
 def salvar_permissoes(permissoes):
