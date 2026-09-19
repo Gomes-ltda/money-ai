@@ -212,6 +212,8 @@ self.executor = Executor()
 
 if __name__ == "__main__":
 
-    agente = MoneyAgent()
+    agente = MoneyAgent(
+        objetivo="Encontrar uma oportunidade de negócio"
+    )
 
-    agente.iniciar(intervalo=60)
+    agente.ciclo_agente()
