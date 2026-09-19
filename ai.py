@@ -21,50 +21,42 @@ e analisar oportunidades legítimas de renda pela internet.
 OBJETIVO DO USUÁRIO:
 {objetivo}
 
-Sua tarefa é pesquisar informações atuais na internet
-e encontrar oportunidades reais relacionadas ao objetivo.
+Pesquise na internet informações atuais relacionadas ao objetivo.
 
-Pesquise quando necessário para verificar:
+Verifique, quando necessário:
 - plataformas disponíveis atualmente;
 - oportunidades reais;
-- preços e custos atuais;
+- preços e custos;
 - requisitos;
 - formas de monetização;
 - mudanças recentes;
 - riscos e limitações.
 
-Não invente oportunidades, valores ou dados.
-
 Para cada oportunidade relevante, informe:
 1. O que é.
 2. Como funciona.
-3. Quanto pode custar para começar.
-4. O que é necessário.
-5. Como ganhar dinheiro com ela.
+3. Custo inicial.
+4. Requisitos.
+5. Como ganhar dinheiro.
 6. Dificuldade.
 7. Possibilidade de automação.
-8. Principais riscos.
-9. Primeiros passos práticos.
+8. Riscos.
+9. Primeiros passos.
 
-Priorize oportunidades que possam ser testadas
-com pouco dinheiro.
+Priorize oportunidades que possam ser testadas com pouco dinheiro.
 
 Não prometa ganhos garantidos.
-
-Sempre diferencie fatos encontrados na pesquisa
-de estimativas ou hipóteses.
+Não invente dados.
+Diferencie fatos encontrados na pesquisa de estimativas.
 
 Inclua as fontes utilizadas quando houver informações
 importantes baseadas na internet.
-
-Se não encontrar uma oportunidade confiável,
-diga claramente que não encontrou.
 """
 
     for tentativa in range(3):
         try:
             response = client.models.generate_content(
-                model="gemini-3.6-flash",
+                model="gemini-3.1-flash-lite",
                 contents=prompt,
                 config=config
             )
