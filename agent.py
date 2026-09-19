@@ -3,7 +3,7 @@ from datetime import datetime
 from executor import Executor
 from Permissões import solicitar_permissao
 from ai import analisar_oportunidade
-from memória import (
+from memory import (
     registrar_evento,
     registrar_resultado,
     registrar_estrategia
