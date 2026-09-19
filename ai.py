@@ -8,14 +8,14 @@ client = genai.Client()
 TINYFISH_API_KEY = os.getenv("TINYFISH_API_KEY")
 
 
-def pesquisar_web(objetivo):
+def pesquisar_web(consulta):
     if not TINYFISH_API_KEY:
         return {
             "erro": "TINYFISH_API_KEY não configurada."
         }
 
     params = {
-        "query": objetivo,
+        "query": consulta,
         "location": "BR",
         "language": "pt",
         "domain_type": "web"
@@ -42,7 +42,7 @@ def pesquisar_web(objetivo):
 
         resultados = []
 
-        for item in dados.get("results", [])[:8]:
+        for item in dados.get("results", [])[:10]:
             resultados.append({
                 "titulo": item.get("title"),
                 "site": item.get("site_name"),
@@ -60,53 +60,153 @@ def pesquisar_web(objetivo):
         }
 
 
-def analisar_oportunidade(objetivo):
-
-    pesquisa = pesquisar_web(
-        f"{objetivo} oportunidades legítimas atuais Brasil"
-    )
-
-    if "erro" in pesquisa:
-        return {
-            "objetivo": objetivo,
-            "erro": pesquisa["erro"],
-            "status": "erro"
-        }
-
-    fontes = pesquisa.get("resultados", [])
-
-    contexto_web = ""
+def formatar_fontes(fontes):
+    contexto = ""
 
     for i, fonte in enumerate(fontes, 1):
-        contexto_web += (
-            f"Fonte {i}\n"
+        contexto += (
+            f"FONTE {i}\n"
             f"Título: {fonte.get('titulo')}\n"
             f"Site: {fonte.get('site')}\n"
             f"Resumo: {fonte.get('resumo')}\n"
             f"URL: {fonte.get('url')}\n\n"
         )
 
-    prompt = (
-        "Você é a Money AI, uma IA especializada em encontrar "
-        "e analisar oportunidades legítimas de renda pela internet.\n\n"
-        f"Objetivo do usuário:\n{objetivo}\n\n"
-        f"Informações encontradas na internet:\n{contexto_web}\n\n"
-        "Produza uma análise prática considerando:\n"
-        "- investimento inicial;\n"
-        "- tempo necessário;\n"
-        "- conhecimentos necessários;\n"
-        "- dificuldade;\n"
-        "- possibilidade de automação;\n"
-        "- riscos;\n"
-        "- formas legítimas de monetização;\n"
-        "- primeiros passos;\n"
-        "- como testar a ideia com baixo custo.\n\n"
-        "Não prometa ganhos garantidos.\n"
-        "Não invente dados.\n"
-        "Diferencie informações encontradas de estimativas.\n"
-        "Se as fontes forem insuficientes, deixe isso claro.\n\n"
-        "Entregue uma resposta objetiva e organizada."
-    )
+    return contexto
+
+
+def analisar_oportunidade(objetivo):
+
+    consultas = [
+        f"{objetivo} oportunidades trabalho renda freelancer Brasil",
+        f"{objetivo} serviços freelas clientes Brasil",
+        f"{objetivo} ganhar dinheiro online oportunidades atuais Brasil"
+    ]
+
+    todas_as_fontes = []
+
+    for consulta in consultas:
+        pesquisa = pesquisar_web(consulta)
+
+        if "resultados" in pesquisa:
+            todas_as_fontes.extend(pesquisa["resultados"])
+
+    if not todas_as_fontes:
+        return {
+            "objetivo": objetivo,
+            "erro": "Não foi possível encontrar resultados na pesquisa.",
+            "status": "erro"
+        }
+
+    # Remove URLs duplicadas
+    fontes_unicas = []
+    urls = set()
+
+    for fonte in todas_as_fontes:
+        url = fonte.get("url")
+
+        if url and url not in urls:
+            urls.add(url)
+            fontes_unicas.append(fonte)
+
+    fontes = fontes_unicas[:20]
+
+    contexto_web = formatar_fontes(fontes)
+
+    prompt = f"""
+Você é a Money AI.
+
+Sua função é encontrar oportunidades legítimas de geração de renda
+e transformar pesquisas na internet em ações concretas que o usuário
+possa executar.
+
+OBJETIVO DO USUÁRIO:
+
+{objetivo}
+
+RESULTADOS ENCONTRADOS NA INTERNET:
+
+{contexto_web}
+
+Analise cuidadosamente os resultados.
+
+IMPORTANTE:
+
+1. Não invente oportunidades, empresas, valores, clientes ou vagas.
+
+2. Não trate uma informação encontrada no snippet como fato confirmado
+se a fonte não fornecer evidência suficiente.
+
+3. Sempre mantenha o URL original quando uma oportunidade concreta
+possuir um link.
+
+4. Diferencie claramente:
+   - oportunidade encontrada;
+   - informação confirmada;
+   - estimativa;
+   - recomendação de ação.
+
+5. Não prometa ganhos.
+
+6. Não incentive golpes, spam, fraude, manipulação, pirataria,
+falsificação, lavagem de dinheiro ou qualquer atividade ilegal.
+
+7. Não recomende pagar para conseguir trabalho quando isso for
+suspeito ou incompatível com a oportunidade.
+
+8. Se o objetivo tiver prazo curto, priorize oportunidades que possam
+ser executadas rapidamente.
+
+9. Se uma oportunidade exigir cadastro, entrevista, aprovação,
+portfólio ou espera para saque, informe isso claramente.
+
+10. Considere que o usuário está no Brasil.
+
+Agora produza uma resposta prática.
+
+Use esta estrutura:
+
+OBJETIVO
+Explique brevemente o que o usuário quer alcançar.
+
+OPORTUNIDADES ENCONTRADAS
+Liste as oportunidades concretas encontradas nas fontes.
+
+Para cada oportunidade informe:
+
+- Nome:
+- Tipo:
+- Onde foi encontrada:
+- Valor ou faixa de valor, se houver:
+- O que precisa fazer:
+- Requisitos:
+- Tempo estimado para começar:
+- Forma de pagamento, se disponível:
+- Link:
+- Nível de dificuldade:
+- Principais riscos ou limitações:
+
+OPORTUNIDADES QUE PODEM SER EXECUTADAS AGORA
+Selecione somente as oportunidades que, de acordo com as fontes,
+parecem poder ser iniciadas imediatamente.
+
+PRÓXIMA AÇÃO
+Explique exatamente o que o usuário deveria fazer primeiro para testar
+a oportunidade.
+
+PLANO DE TESTE
+Crie um pequeno teste de baixo custo ou sem custo para validar a ideia.
+
+ALERTAS
+Liste possíveis golpes, custos escondidos, requisitos, prazos de saque
+ou outras limitações relevantes.
+
+FONTES
+Liste as fontes utilizadas com seus URLs.
+
+Se não houver oportunidades concretas suficientes, diga isso claramente
+em vez de inventar.
+"""
 
     for tentativa in range(3):
         try:
