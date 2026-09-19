@@ -1,13 +1,13 @@
 import time
 from datetime import datetime
-from executor import Executor
-from Permissões import solicitar_permissao
+
 from ai import analisar_oportunidade
 from memory import (
     registrar_evento,
     registrar_resultado,
     registrar_estrategia
 )
+from executor import Executor
 
 
 class MoneyAgent:
@@ -18,7 +18,8 @@ class MoneyAgent:
         self.ciclo = 0
         self.objetivo = objetivo
         self.localizacao = "BR"
-self.executor = Executor()
+        self.executor = Executor()
+
     def registrar(self, tipo, mensagem):
 
         evento = {
@@ -86,37 +87,22 @@ self.executor = Executor()
 
     def executar(self, decisao):
 
-        acao = decisao.get("acao")
-
         self.registrar(
             "EXECUTAR",
-            f"Ação selecionada: {acao}"
+            f"Enviando decisão ao Executor: "
+            f"{decisao.get('acao')}"
         )
 
-        if acao == "aguardar":
-
-            return {
-                "status": "aguardando",
-                "acao": acao
-            }
-
-        estrategia = {
-            "nome": "Estratégia identificada pela Money AI",
-            "descricao": decisao.get("motivo"),
-            "status": "em_teste"
-        }
-
-        registrar_estrategia(
-            estrategia["nome"],
-            estrategia["descricao"],
-            estrategia["status"]
+        resultado = self.executor.executar(
+            decisao
         )
 
-        return {
-            "status": "planejada",
-            "acao": acao,
-            "estrategia": estrategia
-        }
+        self.registrar(
+            "EXECUTOR",
+            f"Resultado: {resultado}"
+        )
+
+        return resultado
 
     def medir(self, resultado):
 
@@ -157,17 +143,25 @@ self.executor = Executor()
 
         dados = self.observar()
 
-        analise = self.analisar(dados)
+        analise = self.analisar(
+            dados
+        )
 
-        decisao = self.decidir(analise)
+        decisao = self.decidir(
+            analise
+        )
 
-        resultado_execucao = self.executar(decisao)
+        resultado_execucao = self.executar(
+            decisao
+        )
 
         resultado = self.medir(
             resultado_execucao
         )
 
-        self.aprender(resultado)
+        self.aprender(
+            resultado
+        )
 
         self.registrar(
             "CICLO",
@@ -189,7 +183,9 @@ self.executor = Executor()
 
                 self.ciclo_agente()
 
-                time.sleep(intervalo)
+                time.sleep(
+                    intervalo
+                )
 
             except Exception as erro:
 
@@ -198,7 +194,9 @@ self.executor = Executor()
                     str(erro)
                 )
 
-                time.sleep(intervalo)
+                time.sleep(
+                    intervalo
+                )
 
     def parar(self):
 
