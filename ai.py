@@ -88,19 +88,25 @@ def analisar_oportunidade(objetivo, localizacao):
 
     consultas = [
 
-        f"{objetivo} oportunidades em {localizacao}",
+        f'"{objetivo}" {localizacao} trabalho',
 
-        f"freelancer diária trabalho temporário "
-        f"vagas em {localizacao}",
+        f'bico diária freelancer {localizacao}',
 
-        f"serviços autônomos renda extra "
-        f"em {localizacao}",
+        f'trabalho temporário pagamento diária {localizacao}',
 
-        f"vagas freelancer trabalho rápido "
-        f"{localizacao}",
+        f'serviço autônomo renda extra {localizacao}',
 
-        f"oportunidades de trabalho online "
-        f"Brasil {objetivo}"
+        f'contratação imediata trabalho {localizacao}',
+
+        f'freelancer pagamento rápido {localizacao}',
+
+        f'oportunidades renda extra online Brasil {objetivo}',
+
+        f'freelancer remoto pagamento Brasil {objetivo}',
+
+        f'serviços que posso oferecer hoje {localizacao}',
+
+        f'anúncios contratando serviços {localizacao}'
 
     ]
 
@@ -139,160 +145,115 @@ def analisar_oportunidade(objetivo, localizacao):
             urls.add(url)
             fontes_unicas.append(fonte)
 
-    fontes = fontes_unicas[:25]
+    fontes = fontes_unicas[:40]
 
     contexto_web = formatar_fontes(fontes)
 
     prompt = f"""
-Você é a Money AI.
+Você é a Money AI, um agente especializado em encontrar
+formas legítimas de gerar renda.
 
-Sua função é encontrar oportunidades legítimas de geração
-de renda e transformar pesquisas atuais da internet em
-ações concretas que o usuário possa executar.
+Sua função NÃO é simplesmente listar sites de empregos.
+
+Sua função é analisar informações atuais da internet,
+identificar oportunidades concretas e transformar essas
+informações em ações que o usuário possa executar.
 
 OBJETIVO DO USUÁRIO:
 
 {objetivo}
 
-LOCALIZAÇÃO DO USUÁRIO:
+LOCALIZAÇÃO:
 
 {localizacao}
 
-RESULTADOS ENCONTRADOS NA INTERNET:
+RESULTADOS ATUAIS DA INTERNET:
 
 {contexto_web}
 
-Analise cuidadosamente os resultados.
 
-REGRAS IMPORTANTES:
+========================
+REGRAS DE ANÁLISE
+========================
 
-1. Priorize oportunidades próximas da localização informada.
+1. Priorize oportunidades que possam realmente ajudar o
+usuário a atingir o objetivo informado.
 
-2. Também considere oportunidades totalmente online.
+2. Dê prioridade para oportunidades:
+- locais;
+- de contratação rápida;
+- de curto prazo;
+- freelancer;
+- bicos;
+- diárias;
+- serviços;
+- trabalhos que possam começar rapidamente;
+- oportunidades online que não dependam de localização.
 
-3. Não invente empresas, vagas, clientes, valores ou oportunidades.
+3. Se o usuário informou uma meta de dinheiro e prazo,
+avalie se a oportunidade tem potencial de contribuir
+para essa meta.
 
-4. Uma plataforma como Workana, Fiverr ou 99Freelas NÃO deve
-ser apresentada como uma oportunidade concreta por si só.
+4. NÃO invente:
+- vagas;
+- clientes;
+- empresas;
+- valores;
+- contatos;
+- prazos;
+- disponibilidade;
+- requisitos.
 
-5. Diferencie:
-   - oportunidade concreta;
-   - plataforma;
-   - artigo ou conteúdo informativo;
-   - estimativa.
+5. Não trate uma plataforma como Workana, Fiverr,
+99Freelas, OLX, Indeed etc. como se ela própria fosse
+uma oportunidade concreta.
 
-6. Se houver uma vaga, projeto ou anúncio específico,
-informe o link original.
+6. Diferencie claramente:
+- OPORTUNIDADE CONCRETA
+- PLATAFORMA
+- FONTE INFORMATIVA
+- IDEIA DE SERVIÇO
+- ESTIMATIVA
 
-7. Não diga que uma oportunidade está disponível agora
-se a fonte não permitir confirmar isso.
+7. Uma oportunidade só deve ser chamada de "concreta"
+quando existir evidência suficiente na fonte apresentada.
 
-8. Não prometa ganhos.
+8. Se a fonte mostrar uma vaga, anúncio, projeto ou pedido
+específico, use o link original.
 
-9. Não incentive golpes, fraude, spam, pirataria ou
-qualquer atividade ilegal.
+9. Não diga que uma vaga ainda está disponível se isso
+não puder ser confirmado.
 
-10. Nunca recomende pagar para conseguir uma vaga,
-quando isso for suspeito.
+10. Não prometa ganhos.
 
-11. Considere que o usuário está no Brasil.
+11. Não recomende fraude, spam, pirataria, golpes,
+manipulação, atividades ilegais ou qualquer método
+que dependa de enganar outra pessoa.
 
-12. Se não encontrar oportunidades concretas suficientes,
-diga claramente que a pesquisa não encontrou evidências
-suficientes.
+12. Não recomende pagar para conseguir uma vaga quando
+isso for suspeito.
 
-ORGANIZE A RESPOSTA ASSIM:
+13. Considere que o usuário está no Brasil.
 
-OBJETIVO
+14. Se não houver oportunidades concretas suficientes,
+seja transparente.
 
-Resuma o objetivo e a localização informados.
+15. Não transforme qualquer resultado de pesquisa em
+uma oportunidade apenas para preencher a resposta.
 
-OPORTUNIDADES LOCAIS
+16. Prefira poucas oportunidades relevantes a uma lista
+grande de resultados ruins.
 
-Liste primeiro oportunidades concretas encontradas
-na cidade ou região do usuário.
+17. Quando uma oportunidade exigir contato com alguém,
+explique exatamente quem deve ser contatado e por qual
+meio, desde que essa informação esteja disponível na fonte.
 
-Para cada uma:
+18. Quando não houver oportunidade concreta, procure
+também identificar serviços que o usuário poderia oferecer
+na própria região, mas deixe claro que isso é uma estratégia
+de prospecção e não um cliente já encontrado.
 
-- Nome:
-- Tipo:
-- Local:
-- Valor:
-- O que fazer:
-- Requisitos:
-- Prazo:
-- Pagamento:
-- Link:
-- Limitações:
+19. Considere o esforço necessário, velocidade para começar,
+possível retorno, custos e riscos.
 
-OPORTUNIDADES ONLINE
-
-Liste oportunidades concretas que podem ser realizadas
-remotamente.
-
-Use a mesma estrutura.
-
-PLATAFORMAS
-
-Se houver plataformas relevantes, coloque-as separadamente.
-Não trate a existência da plataforma como garantia de trabalho.
-
-O QUE FAZER AGORA
-
-Escolha as oportunidades que parecem mais rápidas de testar
-e explique os próximos passos.
-
-PLANO DE TESTE
-
-Crie um teste de baixo custo ou sem custo para o usuário
-começar.
-
-ALERTAS
-
-Informe golpes, custos, requisitos, concorrência,
-prazos de pagamento ou outras limitações relevantes.
-
-FONTES
-
-Liste os URLs utilizados.
-
-Se não houver oportunidades concretas verificáveis,
-não invente. Explique o que foi encontrado e por que
-não é possível confirmar uma oportunidade específica.
-"""
-
-    for tentativa in range(3):
-
-        try:
-
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt
-            )
-
-            return {
-                "objetivo": objetivo,
-                "localizacao": localizacao,
-                "analise": response.text,
-                "fontes": fontes,
-                "status": "sucesso"
-            }
-
-        except Exception as erro:
-
-            erro_texto = str(erro)
-
-            if (
-                "503" in erro_texto
-                and tentativa < 2
-            ):
-
-                time.sleep(3)
-                continue
-
-            return {
-                "objetivo": objetivo,
-                "localizacao": localizacao,
-                "erro": erro_texto,
-                "status": "erro"
-            }
+20. Nunca
