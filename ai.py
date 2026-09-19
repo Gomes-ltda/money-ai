@@ -1,4 +1,4 @@
-import os
+import json
 import time
 
 from google import genai
@@ -25,7 +25,6 @@ def analisar_oportunidade(objetivo, localizacao):
     )
 
     if not fontes:
-
         return {
             "objetivo": objetivo,
             "localizacao": localizacao,
@@ -48,109 +47,95 @@ def analisar_oportunidade(objetivo, localizacao):
     prompt = f"""
 Você é o Cérebro da Money AI.
 
-Seu trabalho é analisar informações reais coletadas
-pela camada de Pesquisa e transformar essas informações
-em decisões econômicas.
+Sua função é transformar pesquisa de mercado em
+decisões operacionais para uma IA que precisa testar
+formas legítimas de gerar receita.
 
-OBJETIVO ATUAL:
+A Money AI começa com R$0 de capital.
+
+OBJETIVO:
 {objetivo}
 
 LOCALIZAÇÃO:
 {localizacao}
 
-INFORMAÇÕES COLETADAS:
+PESQUISA REALIZADA:
 {contexto}
 
 REGRAS:
 
-1. Não invente informações.
+1. Não invente fatos, clientes, preços ou resultados.
 
-2. Diferencie fatos encontrados nas fontes de hipóteses
-ou ideias criadas pela própria IA.
+2. Diferencie claramente evidência encontrada,
+hipótese e decisão da IA.
 
-3. Procure oportunidades econômicas reais.
+3. Não considere uma oportunidade validada apenas
+porque parece interessante.
 
-4. Analise demanda, concorrência, custos, riscos,
-possível receita e dificuldade de execução.
+4. Procure oportunidades que possam ser testadas
+com R$0 inicialmente.
 
-5. Pense como uma empresa que precisa gerar receita,
-e não como um consultor dando dicas ao usuário.
+5. Priorize ações que possam levar à primeira receita
+sem exigir investimento inicial.
 
-6. Uma ideia não deve ser tratada como negócio validado
-sem evidências.
+6. Não prometa ganhos.
 
-7. Se uma estratégia parecer ruim, descarte-a.
+7. Não recomende golpes, spam, fraude, práticas
+enganosas ou atividades ilegais.
 
-8. Se uma estratégia parecer promissora, explique por quê
-e indique como ela poderia ser testada.
+8. A Money AI deve agir como operadora de um negócio,
+não apenas como consultora.
 
-9. Não prometa ganhos.
+9. Escolha UMA oportunidade principal para o próximo teste.
 
-10. Não recomende atividades ilegais, golpes, spam,
-fraudes ou práticas enganosas.
+10. A oportunidade escolhida deve ser específica.
+Evite respostas genéricas como "vender serviços digitais".
 
-RESPONDA COM:
+11. Se a pesquisa não possuir evidência suficiente,
+declare isso e indique qual pesquisa adicional deve
+ser feita antes de executar.
 
-OBJETIVO
+12. Nunca invente potenciais clientes. Se não houver
+clientes identificados nas fontes, diga que ainda
+precisam ser encontrados.
 
-OPORTUNIDADES IDENTIFICADAS
+13. Toda ação externa que envolva publicação, mensagens,
+criação de contas ou dinheiro deve respeitar as
+permissões da Money AI.
 
-Para cada oportunidade:
-- O que é
-- Evidências
-- Demanda
-- Concorrência
-- Custos
-- Riscos
-- Como testar
-- Possível modelo de receita
+RESPONDA EXATAMENTE EM JSON VÁLIDO.
 
-ESTRATÉGIAS PARA TESTAR
+Use esta estrutura:
 
-Liste estratégias que a Money AI poderia testar
-posteriormente.
+{{
+    "objetivo": "...",
 
-PRÓXIMA AÇÃO
+    "oportunidades": [
+        {{
+            "nome": "...",
+            "descricao": "...",
+            "evidencias": [],
+            "demanda": "...",
+            "concorrencia": "...",
+            "custos": "...",
+            "riscos": "...",
+            "modelo_receita": "...",
+            "nivel_confianca": "baixo|medio|alto"
+        }}
+    ],
 
-Indique qual deveria ser a próxima ação da Money AI
-com base nas informações disponíveis.
+    "decisao": {{
+        "estrategia": "...",
+        "nicho": "...",
+        "cliente_alvo": "...",
+        "problema": "...",
+        "oferta": "...",
+        "canal": "...",
+        "preco_teste": "...",
+        "custo_teste": 0,
+        "acao_imediata": "...",
+        "precisa_permissao": false,
+        "motivo_escolha": "..."
+    }},
 
-FONTES
-
-Liste as fontes utilizadas.
-"""
-
-    for tentativa in range(3):
-
-        try:
-
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt
-            )
-
-            return {
-                "objetivo": objetivo,
-                "localizacao": localizacao,
-                "analise": response.text,
-                "fontes": fontes,
-                "status": "sucesso"
-            }
-
-        except Exception as erro:
-
-            erro_texto = str(erro)
-
-            if (
-                "503" in erro_texto
-                and tentativa < 2
-            ):
-                time.sleep(3)
-                continue
-
-            return {
-                "objetivo": objetivo,
-                "localizacao": localizacao,
-                "erro": erro_texto,
-                "status": "erro"
-            }
+    "proximo_p
