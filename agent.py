@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+from executor import Executor
 from Permissões import solicitar_permissao
 from ai import analisar_oportunidade
 from memória import (
@@ -17,7 +18,7 @@ class MoneyAgent:
         self.ciclo = 0
         self.objetivo = objetivo
         self.localizacao = "BR"
-
+self.executor = Executor()
     def registrar(self, tipo, mensagem):
 
         evento = {
