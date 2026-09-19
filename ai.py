@@ -1,5 +1,5 @@
+import time
 from google import genai
-
 
 client = genai.Client()
 
@@ -12,7 +12,7 @@ e analisar oportunidades legítimas de renda pela internet.
 O objetivo do usuário é:
 {objetivo}
 
-Analise esse objetivo considerando:
+Analise considerando:
 
 - investimento inicial;
 - tempo necessário;
@@ -32,21 +32,28 @@ deixe isso claro.
 Entregue uma análise prática, objetiva e organizada.
 """
 
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
+    for tentativa in range(3):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt
+            )
 
-        return {
-            "objetivo": objetivo,
-            "analise": response.text,
-            "status": "sucesso"
-        }
+            return {
+                "objetivo": objetivo,
+                "analise": response.text,
+                "status": "sucesso"
+            }
 
-    except Exception as erro:
-        return {
-            "objetivo": objetivo,
-            "erro": str(erro),
-            "status": "erro"
-        }
+        except Exception as erro:
+            erro_texto = str(erro)
+
+            if "503" in erro_texto and tentativa < 2:
+                time.sleep(3)
+                continue
+
+            return {
+                "objetivo": objetivo,
+                "erro": erro_texto,
+                "status": "erro"
+            }
