@@ -1,7 +1,16 @@
 import time
 from google import genai
+from google.genai import types
 
 client = genai.Client()
+
+grounding_tool = types.Tool(
+    google_search=types.GoogleSearch()
+)
+
+config = types.GenerateContentConfig(
+    tools=[grounding_tool]
+)
 
 
 def analisar_oportunidade(objetivo):
@@ -9,34 +18,55 @@ def analisar_oportunidade(objetivo):
 Você é a Money AI, uma IA especializada em encontrar
 e analisar oportunidades legítimas de renda pela internet.
 
-O objetivo do usuário é:
+OBJETIVO DO USUÁRIO:
 {objetivo}
 
-Analise considerando:
+Sua tarefa é pesquisar informações atuais na internet
+e encontrar oportunidades reais relacionadas ao objetivo.
 
-- investimento inicial;
-- tempo necessário;
-- conhecimentos necessários;
-- dificuldade;
-- possibilidade de automação;
-- riscos;
-- formas legítimas de monetização;
-- primeiros passos;
-- como testar a ideia com baixo custo.
+Pesquise quando necessário para verificar:
+- plataformas disponíveis atualmente;
+- oportunidades reais;
+- preços e custos atuais;
+- requisitos;
+- formas de monetização;
+- mudanças recentes;
+- riscos e limitações.
+
+Não invente oportunidades, valores ou dados.
+
+Para cada oportunidade relevante, informe:
+1. O que é.
+2. Como funciona.
+3. Quanto pode custar para começar.
+4. O que é necessário.
+5. Como ganhar dinheiro com ela.
+6. Dificuldade.
+7. Possibilidade de automação.
+8. Principais riscos.
+9. Primeiros passos práticos.
+
+Priorize oportunidades que possam ser testadas
+com pouco dinheiro.
 
 Não prometa ganhos garantidos.
-Não invente dados.
-Se uma informação depender de pesquisa atual,
-deixe isso claro.
 
-Entregue uma análise prática, objetiva e organizada.
+Sempre diferencie fatos encontrados na pesquisa
+de estimativas ou hipóteses.
+
+Inclua as fontes utilizadas quando houver informações
+importantes baseadas na internet.
+
+Se não encontrar uma oportunidade confiável,
+diga claramente que não encontrou.
 """
 
     for tentativa in range(3):
         try:
             response = client.models.generate_content(
                 model="gemini-3.6-flash",
-                contents=prompt
+                contents=prompt,
+                config=config
             )
 
             return {
