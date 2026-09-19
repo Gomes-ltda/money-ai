@@ -76,7 +76,8 @@ class MoneyAgent:
 
             return {
                 "acao": "aguardar",
-                "motivo": "Não foi possível concluir a análise."
+                "motivo": "Não foi possível concluir a análise.",
+                "analise": analise
             }
 
         return {
@@ -111,12 +112,14 @@ class MoneyAgent:
             f"Resultado do ciclo: {resultado}"
         )
 
-        return {
+        medicao = {
             "receita": 0,
             "custo": 0,
             "resultado": 0,
             "status": resultado.get("status")
         }
+
+        return medicao
 
     def aprender(self, resultado):
 
@@ -168,6 +171,15 @@ class MoneyAgent:
             f"Ciclo {self.ciclo} concluído."
         )
 
+        return {
+            "ciclo": self.ciclo,
+            "observacao": dados,
+            "analise": analise,
+            "decisao": decisao,
+            "execucao": resultado_execucao,
+            "medicao": resultado
+        }
+
     def iniciar(self, intervalo=60):
 
         self.ativo = True
@@ -214,4 +226,6 @@ if __name__ == "__main__":
         objetivo="Encontrar uma oportunidade de negócio"
     )
 
-    agente.ciclo_agente()
+    resultado = agente.ciclo_agente()
+
+    print(resultado)
