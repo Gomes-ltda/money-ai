@@ -1,12 +1,16 @@
 import time
-from datetime import datetime
 
 from ai import analisar_oportunidade
+
 from memory import (
     registrar_evento,
     registrar_resultado,
-    registrar_estrategia
+    registrar_estrategia,
+    registrar_ciclo,
+    registrar_teste,
+    registrar_aprendizado
 )
+
 from executor import Executor
 
 
@@ -22,20 +26,13 @@ class MoneyAgent:
 
     def registrar(self, tipo, mensagem):
 
-        evento = {
-            "data": datetime.utcnow().isoformat(),
-            "tipo": tipo,
-            "mensagem": mensagem
-        }
-
         registrar_evento(
             tipo,
             mensagem
         )
 
         print(
-            f"[{evento['tipo']}] "
-            f"{evento['mensagem']}"
+            f"[{tipo}] {mensagem}"
         )
 
     def observar(self):
@@ -65,6 +62,53 @@ class MoneyAgent:
 
         return analise
 
+    def extrair_estrategia(self, analise):
+
+        if not isinstance(analise, dict):
+            return None
+
+        estrategia = analise.get(
+            "estrategia"
+        )
+
+        if estrategia:
+            return estrategia
+
+        texto = analise.get(
+            "analise",
+            ""
+        )
+
+        if not isinstance(texto, str):
+            return None
+
+        marcadores = [
+            "Oportunidade 1:",
+            "Oportunidade 1 -",
+            "Estratégia:"
+        ]
+
+        for marcador in marcadores:
+
+            if marcador.lower() in texto.lower():
+
+                partes = texto.split(
+                    marcador,
+                    1
+                )
+
+                if len(partes) == 2:
+
+                    estrategia = partes[1].split(
+                        "\n",
+                        1
+                    )[0].strip()
+
+                    if estrategia:
+                        return estrategia[:200]
+
+        return None
+
     def decidir(self, analise):
 
         self.registrar(
@@ -72,17 +116,34 @@ class MoneyAgent:
             "Definindo a próxima ação."
         )
 
+        if not isinstance(analise, dict):
+
+            return {
+                "acao": "aguardar",
+                "motivo": "Análise inválida.",
+                "analise": analise
+            }
+
         if analise.get("status") != "sucesso":
 
             return {
                 "acao": "aguardar",
-                "motivo": "Não foi possível concluir a análise.",
+                "motivo": (
+                    "Não foi possível concluir a análise."
+                ),
                 "analise": analise
             }
 
+        estrategia = self.extrair_estrategia(
+            analise
+        )
+
         return {
             "acao": "testar_estrategia",
-            "motivo": "Estratégia identificada pelo Cérebro.",
+            "motivo": (
+                "Estratégia identificada pelo Cérebro."
+            ),
+            "estrategia": estrategia,
             "analise": analise
         }
 
@@ -90,142 +151,10 @@ class MoneyAgent:
 
         self.registrar(
             "EXECUTAR",
-            f"Enviando decisão ao Executor: "
-            f"{decisao.get('acao')}"
+            (
+                "Enviando decisão ao Executor: "
+                f"{decisao.get('acao')}"
+            )
         )
 
-        resultado = self.executor.executar(
-            decisao
-        )
-
-        self.registrar(
-            "EXECUTOR",
-            f"Resultado: {resultado}"
-        )
-
-        return resultado
-
-    def medir(self, resultado):
-
-        self.registrar(
-            "MEDIR",
-            f"Resultado do ciclo: {resultado}"
-        )
-
-        medicao = {
-            "receita": 0,
-            "custo": 0,
-            "resultado": 0,
-            "status": resultado.get("status")
-        }
-
-        return medicao
-
-    def aprender(self, resultado):
-
-        self.registrar(
-            "APRENDER",
-            "Registrando o resultado para ciclos futuros."
-        )
-
-        registrar_resultado(
-            "Ciclo da Money AI",
-            receita=resultado.get("receita", 0),
-            custo=resultado.get("custo", 0),
-            resultado=resultado.get("resultado", 0)
-        )
-
-    def ciclo_agente(self):
-
-        self.ciclo += 1
-
-        self.registrar(
-            "CICLO",
-            f"Iniciando ciclo {self.ciclo}."
-        )
-
-        dados = self.observar()
-
-        analise = self.analisar(
-            dados
-        )
-
-        decisao = self.decidir(
-            analise
-        )
-
-        resultado_execucao = self.executar(
-            decisao
-        )
-
-        resultado = self.medir(
-            resultado_execucao
-        )
-
-        self.aprender(
-            resultado
-        )
-
-        self.registrar(
-            "CICLO",
-            f"Ciclo {self.ciclo} concluído."
-        )
-
-        return {
-            "ciclo": self.ciclo,
-            "observacao": dados,
-            "analise": analise,
-            "decisao": decisao,
-            "execucao": resultado_execucao,
-            "medicao": resultado
-        }
-
-    def iniciar(self, intervalo=60):
-
-        self.ativo = True
-
-        self.registrar(
-            "SISTEMA",
-            "Money AI iniciada."
-        )
-
-        while self.ativo:
-
-            try:
-
-                self.ciclo_agente()
-
-                time.sleep(
-                    intervalo
-                )
-
-            except Exception as erro:
-
-                self.registrar(
-                    "ERRO",
-                    str(erro)
-                )
-
-                time.sleep(
-                    intervalo
-                )
-
-    def parar(self):
-
-        self.ativo = False
-
-        self.registrar(
-            "SISTEMA",
-            "Money AI parada."
-        )
-
-
-if __name__ == "__main__":
-
-    agente = MoneyAgent(
-        objetivo="Encontrar uma oportunidade de negócio"
-    )
-
-    resultado = agente.ciclo_agente()
-
-    print(resultado)
+        resultado = self.executor.execut
