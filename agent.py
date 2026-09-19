@@ -1,13 +1,22 @@
 import time
 from datetime import datetime
 
+from ai import analisar_oportunidade
+from memória import (
+    registrar_evento,
+    registrar_resultado,
+    registrar_estrategia
+)
+
 
 class MoneyAgent:
 
-    def __init__(self):
+    def __init__(self, objetivo="Gerar receita"):
+
         self.ativo = False
         self.ciclo = 0
-        self.historico = []
+        self.objetivo = objetivo
+        self.localizacao = "BR"
 
     def registrar(self, tipo, mensagem):
 
@@ -17,7 +26,10 @@ class MoneyAgent:
             "mensagem": mensagem
         }
 
-        self.historico.append(evento)
+        registrar_evento(
+            tipo,
+            mensagem
+        )
 
         print(
             f"[{evento['tipo']}] "
@@ -28,50 +40,109 @@ class MoneyAgent:
 
         self.registrar(
             "OBSERVAR",
-            "Iniciando análise do ambiente."
+            "Coletando informações para o próximo ciclo."
         )
 
         return {
-            "objetivo": "Gerar receita",
-            "status": "analisando"
+            "objetivo": self.objetivo,
+            "localizacao": self.localizacao,
+            "ciclo": self.ciclo
         }
 
     def analisar(self, dados):
 
         self.registrar(
             "ANALISAR",
-            f"Analisando situação: {dados}"
+            "Enviando informações ao Cérebro."
         )
 
-        decisao = {
-            "acao": "pesquisar_oportunidades",
-            "motivo": (
-                "Pesquisar atividades econômicas "
-                "que possam gerar receita."
-            )
-        }
+        analise = analisar_oportunidade(
+            dados["objetivo"],
+            dados["localizacao"]
+        )
 
-        return decisao
+        return analise
+
+    def decidir(self, analise):
+
+        self.registrar(
+            "DECIDIR",
+            "Definindo a próxima ação."
+        )
+
+        if analise.get("status") != "sucesso":
+
+            return {
+                "acao": "aguardar",
+                "motivo": "Não foi possível concluir a análise."
+            }
+
+        return {
+            "acao": "testar_estrategia",
+            "motivo": "Estratégia identificada pelo Cérebro.",
+            "analise": analise
+        }
 
     def executar(self, decisao):
 
+        acao = decisao.get("acao")
+
         self.registrar(
             "EXECUTAR",
-            f"Executando: {decisao['acao']}"
+            f"Ação selecionada: {acao}"
         )
 
-        resultado = {
-            "status": "executado",
-            "acao": decisao["acao"]
+        if acao == "aguardar":
+
+            return {
+                "status": "aguardando",
+                "acao": acao
+            }
+
+        estrategia = {
+            "nome": "Estratégia identificada pela Money AI",
+            "descricao": decisao.get("motivo"),
+            "status": "em_teste"
         }
 
-        return resultado
+        registrar_estrategia(
+            estrategia["nome"],
+            estrategia["descricao"],
+            estrategia["status"]
+        )
+
+        return {
+            "status": "planejada",
+            "acao": acao,
+            "estrategia": estrategia
+        }
+
+    def medir(self, resultado):
+
+        self.registrar(
+            "MEDIR",
+            f"Resultado do ciclo: {resultado}"
+        )
+
+        return {
+            "receita": 0,
+            "custo": 0,
+            "resultado": 0,
+            "status": resultado.get("status")
+        }
 
     def aprender(self, resultado):
 
         self.registrar(
             "APRENDER",
-            f"Resultado registrado: {resultado}"
+            "Registrando o resultado para ciclos futuros."
+        )
+
+        registrar_resultado(
+            "Ciclo da Money AI",
+            receita=resultado.get("receita", 0),
+            custo=resultado.get("custo", 0),
+            resultado=resultado.get("resultado", 0)
         )
 
     def ciclo_agente(self):
@@ -85,9 +156,15 @@ class MoneyAgent:
 
         dados = self.observar()
 
-        decisao = self.analisar(dados)
+        analise = self.analisar(dados)
 
-        resultado = self.executar(decisao)
+        decisao = self.decidir(analise)
+
+        resultado_execucao = self.executar(decisao)
+
+        resultado = self.medir(
+            resultado_execucao
+        )
 
         self.aprender(resultado)
 
