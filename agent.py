@@ -1,6 +1,6 @@
 import time
 from datetime import datetime
-
+from Permissões import solicitar_permissao
 from ai import analisar_oportunidade
 from memória import (
     registrar_evento,
