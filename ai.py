@@ -1,36 +1,52 @@
-import os
+from google import genai
+
+
+client = genai.Client()
+
 
 def analisar_oportunidade(objetivo):
-    """
-    Recebe o objetivo do usuário e prepara a solicitação
-    que futuramente será enviada ao modelo de IA.
-    """
-
     prompt = f"""
 Você é a Money AI, uma IA especializada em encontrar
 e analisar oportunidades legítimas de renda pela internet.
 
-Objetivo do usuário:
+O objetivo do usuário é:
 {objetivo}
 
-Analise o objetivo considerando:
+Analise esse objetivo considerando:
+
 - investimento inicial;
-- tempo disponível;
+- tempo necessário;
 - conhecimentos necessários;
 - dificuldade;
 - possibilidade de automação;
 - riscos;
-- como começar;
+- formas legítimas de monetização;
+- primeiros passos;
 - como testar a ideia com baixo custo.
 
 Não prometa ganhos garantidos.
-Priorize oportunidades legítimas e legais.
+Não invente dados.
+Se uma informação depender de pesquisa atual,
+deixe isso claro.
 
-Retorne uma análise prática e objetiva.
+Entregue uma análise prática, objetiva e organizada.
 """
 
-    return {
-        "objetivo": objetivo,
-        "prompt": prompt,
-        "status": "pronto_para_IA"
-    }
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt
+        )
+
+        return {
+            "objetivo": objetivo,
+            "analise": response.text,
+            "status": "sucesso"
+        }
+
+    except Exception as erro:
+        return {
+            "objetivo": objetivo,
+            "erro": str(erro),
+            "status": "erro"
+        }
