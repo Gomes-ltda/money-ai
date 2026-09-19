@@ -35,7 +35,6 @@ def analisar_oportunidade(objetivo, localizacao):
     contexto = ""
 
     for i, fonte in enumerate(fontes[:40], 1):
-
         contexto += (
             f"FONTE {i}\n"
             f"Título: {fonte.get('titulo')}\n"
@@ -47,9 +46,9 @@ def analisar_oportunidade(objetivo, localizacao):
     prompt = f"""
 Você é o Cérebro da Money AI.
 
-Sua função é transformar pesquisa de mercado em
-decisões operacionais para uma IA que precisa testar
-formas legítimas de gerar receita.
+Sua função é transformar pesquisa de mercado em decisões
+operacionais para uma IA que precisa testar formas legítimas
+de gerar receita.
 
 A Money AI começa com R$0 de capital.
 
@@ -89,19 +88,15 @@ não apenas como consultora.
 9. Escolha UMA oportunidade principal para o próximo teste.
 
 10. A oportunidade escolhida deve ser específica.
-Evite respostas genéricas como "vender serviços digitais".
 
 11. Se a pesquisa não possuir evidência suficiente,
 declare isso e indique qual pesquisa adicional deve
 ser feita antes de executar.
 
-12. Nunca invente potenciais clientes. Se não houver
-clientes identificados nas fontes, diga que ainda
-precisam ser encontrados.
+12. Nunca invente potenciais clientes.
 
 13. Toda ação externa que envolva publicação, mensagens,
-criação de contas ou dinheiro deve respeitar as
-permissões da Money AI.
+criação de contas ou dinheiro deve respeitar as permissões.
 
 RESPONDA EXATAMENTE EM JSON VÁLIDO.
 
@@ -109,7 +104,6 @@ Use esta estrutura:
 
 {{
     "objetivo": "...",
-
     "oportunidades": [
         {{
             "nome": "...",
@@ -123,7 +117,6 @@ Use esta estrutura:
             "nivel_confianca": "baixo|medio|alto"
         }}
     ],
-
     "decisao": {{
         "estrategia": "...",
         "nicho": "...",
@@ -137,5 +130,69 @@ Use esta estrutura:
         "precisa_permissao": false,
         "motivo_escolha": "..."
     }},
+    "proximo_passo": "...",
+    "pesquisa_adicional_necessaria": [],
+    "fontes_utilizadas": []
+}}
 
-    "proximo_p
+IMPORTANTE:
+
+- "custo_teste" deve ser um número.
+- Enquanto a Money AI estiver na fase R$0,
+  "custo_teste" deve ser 0.
+- "precisa_permissao" deve ser true se a próxima
+  ação exigir publicação, envio de mensagens,
+  criação de conta ou movimentação/gasto de dinheiro.
+- "acao_imediata" deve ser uma ação concreta.
+- Não coloque explicações fora do JSON.
+"""
+
+    for tentativa in range(3):
+
+        try:
+
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt
+            )
+
+            texto = response.text.strip()
+
+            if texto.startswith("```"):
+                texto = texto.replace("```json", "")
+                texto = texto.replace("```", "")
+                texto = texto.strip()
+
+            try:
+                decisao = json.loads(texto)
+
+            except json.JSONDecodeError:
+
+                return {
+                    "objetivo": objetivo,
+                    "localizacao": localizacao,
+                    "analise": response.text,
+                    "fontes": fontes,
+                    "erro": "A IA respondeu, mas não retornou JSON válido.",
+                    "status": "erro"
+                }
+
+            decisao["fontes_brutas"] = fontes
+            decisao["status"] = "sucesso"
+
+            return decisao
+
+        except Exception as erro:
+
+            erro_texto = str(erro)
+
+            if "503" in erro_texto and tentativa < 2:
+                time.sleep(3)
+                continue
+
+            return {
+                "objetivo": objetivo,
+                "localizacao": localizacao,
+                "erro": erro_texto,
+                "status": "erro"
+            }
