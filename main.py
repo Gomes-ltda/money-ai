@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify
+from ai import analisar_oportunidade
 
 app = Flask(__name__)
+
 
 @app.route("/")
 def home():
@@ -10,16 +12,21 @@ def home():
         "mensagem": "Sistema iniciado."
     })
 
+
 @app.route("/analisar", methods=["POST"])
 def analisar():
-    dados = request.json or {}
-    objetivo = dados.get("objetivo", "")
+    dados = request.get_json(silent=True) or {}
+    objetivo = dados.get("objetivo", "").strip()
 
-    return jsonify({
-        "objetivo": objetivo,
-        "status": "recebido",
-        "proxima_etapa": "Analisar oportunidades."
-    })
+    if not objetivo:
+        return jsonify({
+            "erro": "Informe um objetivo."
+        }), 400
+
+    resultado = analisar_oportunidade(objetivo)
+
+    return jsonify(resultado)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
