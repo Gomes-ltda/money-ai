@@ -1,6 +1,7 @@
 import re
 
 from Permissões import solicitar_permissao
+from pesquisa import pesquisar
 
 
 class Executor:
@@ -18,7 +19,6 @@ class Executor:
         permissao = solicitar_permissao(acao)
 
         if not permissao["permitido"]:
-
             return {
                 "status": "bloqueado",
                 "acao": acao,
@@ -32,22 +32,15 @@ class Executor:
         acao = decisao.get("acao")
 
         if acao == "aguardar":
-
             return {
                 "status": "aguardando",
                 "acao": acao
             }
 
         if acao == "pesquisar":
-
-            return {
-                "status": "executado",
-                "acao": acao,
-                "resultado": "Pesquisa autorizada."
-            }
+            return self.executar_pesquisa(decisao)
 
         if acao == "analisar":
-
             return {
                 "status": "executado",
                 "acao": acao,
@@ -55,7 +48,6 @@ class Executor:
             }
 
         if acao == "testar_estrategia":
-
             return self.testar_estrategia(decisao)
 
         return {
@@ -64,37 +56,59 @@ class Executor:
             "motivo": "Executor ainda não possui essa ação."
         }
 
+    def executar_pesquisa(self, decisao):
+
+        consulta = (
+            decisao.get("consulta")
+            or decisao.get("objetivo")
+            or decisao.get("estrategia")
+        )
+
+        if not consulta:
+            return {
+                "status": "erro",
+                "acao": "pesquisar",
+                "motivo": "Nenhuma consulta foi definida."
+            }
+
+        try:
+            resultado = pesquisar(consulta)
+
+            return {
+                "status": "executado",
+                "acao": "pesquisar",
+                "consulta": consulta,
+                "resultado": resultado
+            }
+
+        except Exception as erro:
+            return {
+                "status": "erro",
+                "acao": "pesquisar",
+                "consulta": consulta,
+                "motivo": str(erro)
+            }
+
     def testar_estrategia(self, decisao):
 
         analise = decisao.get("analise", {})
-
         estrategia = decisao.get("estrategia")
 
         if not estrategia and isinstance(analise, dict):
-
             estrategia = analise.get("estrategia")
 
         texto_analise = ""
 
         if isinstance(analise, dict):
-
-            texto_analise = analise.get(
-                "analise",
-                ""
-            )
+            texto_analise = analise.get("analise", "")
 
         elif isinstance(analise, str):
-
             texto_analise = analise
 
         if not estrategia and texto_analise:
-
-            estrategia = self.extrair_estrategia(
-                texto_analise
-            )
+            estrategia = self.extrair_estrategia(texto_analise)
 
         if not estrategia:
-
             return {
                 "status": "erro",
                 "acao": "testar_estrategia",
@@ -109,6 +123,20 @@ class Executor:
             texto_analise
         )
 
+        # Execução R$0.
+        # Nesta fase a IA pode pesquisar e preparar
+        # uma operação, mas não pode publicar,
+        # mandar mensagens, criar contas ou gastar dinheiro.
+
+        pesquisa_consulta = self.criar_consulta_pesquisa(
+            estrategia,
+            plano
+        )
+
+        pesquisa_resultado = self.executar_pesquisa({
+            "consulta": pesquisa_consulta
+        })
+
         return {
             "status": "executado",
             "acao": "testar_estrategia",
@@ -118,17 +146,16 @@ class Executor:
 
             "hipotese": plano["hipotese"],
 
-            "objetivo_teste": plano[
-                "objetivo_teste"
-            ],
+            "objetivo_teste": plano["objetivo_teste"],
 
-            "acoes_planejadas": plano[
-                "acoes_planejadas"
-            ],
+            "acoes_planejadas": plano["acoes_planejadas"],
 
-            "metricas": plano[
-                "metricas"
-            ],
+            "pesquisa": {
+                "consulta": pesquisa_consulta,
+                "resultado": pesquisa_resultado
+            },
+
+            "metricas": plano["metricas"],
 
             "restricoes": {
                 "custo_maximo": 0,
@@ -144,10 +171,22 @@ class Executor:
             "resultado": 0,
 
             "proximo_passo": (
-                "Executar as etapas permitidas "
-                "do teste R$0 e medir os resultados."
+                "Analisar os resultados da pesquisa, "
+                "identificar oportunidades concretas "
+                "e preparar uma oferta R$0."
             )
         }
+
+    def criar_consulta_pesquisa(self, estrategia, plano):
+
+        return (
+            f"Pesquise oportunidades reais de geração de receita "
+            f"para a seguinte estratégia: {estrategia}. "
+            f"Objetivo: {plano['objetivo_teste']}. "
+            f"Identifique demanda, potenciais clientes, "
+            f"problemas existentes, concorrentes, preços praticados "
+            f"e formas de testar a oferta sem investimento inicial."
+        )
 
     def extrair_estrategia(self, texto):
 
@@ -169,27 +208,16 @@ class Executor:
 
                 estrategia = resultado.group(1).strip()
 
-                estrategia = estrategia.split(
-                    "\n"
-                )[0].strip()
-
-                estrategia = estrategia.rstrip(
-                    "."
-                )
+                estrategia = estrategia.split("\n")[0].strip()
 
                 if len(estrategia) > 200:
-
                     estrategia = estrategia[:200].strip()
 
-                return estrategia
+                return estrategia.rstrip(".")
 
         return None
 
-    def criar_plano_teste(
-        self,
-        estrategia,
-        texto_analise
-    ):
+    def criar_plano_teste(self, estrategia, texto_analise):
 
         estrategia_lower = estrategia.lower()
 
@@ -206,7 +234,7 @@ class Executor:
             )
 
             objetivo = (
-                "Validar se existe uma demanda concreta "
+                "Validar se existe demanda concreta "
                 "por uma solução simples de automação "
                 "ou IA sem gastar dinheiro."
             )
@@ -214,10 +242,11 @@ class Executor:
             acoes = [
                 "Definir uma oferta mínima e específica.",
                 "Definir o tipo de pequeno negócio a ser testado.",
-                "Identificar problemas que podem ser automatizados.",
-                "Pesquisar potenciais clientes e sinais de demanda.",
+                "Pesquisar problemas reais desse público.",
+                "Identificar potenciais clientes.",
+                "Pesquisar concorrentes e preços.",
                 "Preparar uma proposta de solução.",
-                "Registrar os resultados do teste."
+                "Registrar os resultados."
             ]
 
         elif (
@@ -234,17 +263,19 @@ class Executor:
             )
 
             objetivo = (
-                "Identificar um serviço simples que possa "
-                "ser validado sem custo."
+                "Identificar um serviço específico "
+                "que possa ser validado sem custo."
             )
 
             acoes = [
                 "Definir um serviço específico.",
                 "Definir o público que pode precisar dele.",
-                "Pesquisar demanda e concorrentes.",
+                "Pesquisar demanda.",
+                "Pesquisar concorrentes.",
+                "Pesquisar preços.",
                 "Definir uma oferta inicial.",
-                "Preparar uma demonstração ou exemplo.",
-                "Registrar os resultados do teste."
+                "Preparar uma demonstração.",
+                "Registrar os resultados."
             ]
 
         else:
@@ -256,8 +287,9 @@ class Executor:
             )
 
             objetivo = (
-                "Validar a estratégia utilizando somente "
-                "pesquisa, análise e preparação, sem gastos."
+                "Validar a estratégia utilizando "
+                "pesquisa, análise e preparação, "
+                "sem gastos."
             )
 
             acoes = [
@@ -265,6 +297,7 @@ class Executor:
                 "Definir o público-alvo.",
                 "Pesquisar demanda.",
                 "Pesquisar concorrentes.",
+                "Pesquisar preços.",
                 "Criar uma proposta inicial.",
                 "Registrar os resultados."
             ]
@@ -272,6 +305,8 @@ class Executor:
         metricas = [
             "Quantidade de potenciais clientes identificados",
             "Quantidade de sinais de demanda encontrados",
+            "Quantidade de concorrentes encontrados",
+            "Faixa de preços identificada",
             "Quantidade de ofertas preparadas",
             "Custo do teste",
             "Receita gerada",
