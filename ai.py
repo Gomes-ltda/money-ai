@@ -37,10 +37,11 @@ def pesquisar_web(consulta):
 
         if resposta.status_code != 200:
             return {
-                "erro":
+                "erro": (
                     f"TinyFish HTTP "
                     f"{resposta.status_code}: "
                     f"{resposta.text}"
+                )
             }
 
         dados = resposta.json()
@@ -75,7 +76,7 @@ def formatar_fontes(fontes):
 
         contexto += (
             f"FONTE {i}\n"
-            f"Título: {fonte.get('titulo')}\n"
+            f"Titulo: {fonte.get('titulo')}\n"
             f"Site: {fonte.get('site')}\n"
             f"Resumo: {fonte.get('resumo')}\n"
             f"URL: {fonte.get('url')}\n\n"
@@ -87,27 +88,16 @@ def formatar_fontes(fontes):
 def analisar_oportunidade(objetivo, localizacao):
 
     consultas = [
-
-        f'"{objetivo}" {localizacao} trabalho',
-
-        f'bico diária freelancer {localizacao}',
-
-        f'trabalho temporário pagamento diária {localizacao}',
-
-        f'serviço autônomo renda extra {localizacao}',
-
-        f'contratação imediata trabalho {localizacao}',
-
-        f'freelancer pagamento rápido {localizacao}',
-
-        f'oportunidades renda extra online Brasil {objetivo}',
-
-        f'freelancer remoto pagamento Brasil {objetivo}',
-
-        f'serviços que posso oferecer hoje {localizacao}',
-
-        f'anúncios contratando serviços {localizacao}'
-
+        f"{objetivo} {localizacao} trabalho",
+        f"bico diaria freelancer {localizacao}",
+        f"trabalho temporario pagamento diaria {localizacao}",
+        f"servico autonomo renda extra {localizacao}",
+        f"contratacao imediata trabalho {localizacao}",
+        f"freelancer pagamento rapido {localizacao}",
+        f"oportunidades renda extra online Brasil {objetivo}",
+        f"freelancer remoto pagamento Brasil {objetivo}",
+        f"servicos que posso oferecer hoje {localizacao}",
+        f"anuncios contratando servicos {localizacao}"
     ]
 
     todas_as_fontes = []
@@ -117,7 +107,6 @@ def analisar_oportunidade(objetivo, localizacao):
         pesquisa = pesquisar_web(consulta)
 
         if "resultados" in pesquisa:
-
             todas_as_fontes.extend(
                 pesquisa["resultados"]
             )
@@ -127,9 +116,10 @@ def analisar_oportunidade(objetivo, localizacao):
         return {
             "objetivo": objetivo,
             "localizacao": localizacao,
-            "erro":
-                "Não foi possível encontrar "
-                "resultados na pesquisa.",
+            "erro": (
+                "Nao foi possivel encontrar "
+                "resultados na pesquisa."
+            ),
             "status": "erro"
         }
 
@@ -149,111 +139,175 @@ def analisar_oportunidade(objetivo, localizacao):
 
     contexto_web = formatar_fontes(fontes)
 
-    prompt = f"""
-Você é a Money AI, um agente especializado em encontrar
-formas legítimas de gerar renda.
+    prompt_partes = [
 
-Sua função NÃO é simplesmente listar sites de empregos.
+        "Voce e a Money AI.",
+        "",
+        "Sua funcao e encontrar formas legitimas de gerar renda.",
+        "",
+        "Voce nao deve simplesmente listar sites de empregos.",
+        "Deve analisar informacoes atuais da internet, "
+        "identificar oportunidades concretas e transformar "
+        "essas informacoes em acoes praticas.",
+        "",
+        "OBJETIVO DO USUARIO:",
+        objetivo,
+        "",
+        "LOCALIZACAO:",
+        localizacao,
+        "",
+        "RESULTADOS ATUAIS DA INTERNET:",
+        contexto_web,
+        "",
+        "REGRAS DE ANALISE:",
+        "",
+        "1. Priorize oportunidades que possam realmente "
+        "ajudar o usuario a atingir o objetivo.",
+        "",
+        "2. Priorize oportunidades locais, bicos, diarias, "
+        "freelancer, servicos, trabalhos temporarios e "
+        "oportunidades online.",
+        "",
+        "3. Se houver valor ou prazo informado pelo usuario, "
+        "considere isso na analise.",
+        "",
+        "4. Nunca invente vagas, clientes, empresas, valores, "
+        "contatos, prazos ou disponibilidade.",
+        "",
+        "5. Plataformas como Workana, Fiverr, 99Freelas, "
+        "OLX e Indeed nao sao oportunidades concretas "
+        "por si mesmas.",
+        "",
+        "6. Classifique resultados como:",
+        "A - Oportunidade concreta",
+        "B - Possivel oportunidade",
+        "C - Plataforma",
+        "D - Informacao",
+        "E - Ideia de servico",
+        "",
+        "7. So chame algo de oportunidade concreta quando "
+        "houver evidencia suficiente na fonte.",
+        "",
+        "8. Se houver vaga, anuncio ou projeto especifico, "
+        "use o link original.",
+        "",
+        "9. Nao diga que algo esta disponivel agora se isso "
+        "nao puder ser confirmado.",
+        "",
+        "10. Nao prometa ganhos.",
+        "",
+        "11. Nao recomende fraude, spam, pirataria, golpes "
+        "ou atividades ilegais.",
+        "",
+        "12. Nao recomende pagar para conseguir uma vaga "
+        "quando isso for suspeito.",
+        "",
+        "13. Prefira poucas oportunidades relevantes a uma "
+        "lista grande de resultados ruins.",
+        "",
+        "14. Se nao houver oportunidades concretas, "
+        "seja transparente.",
+        "",
+        "15. Quando nao houver oportunidade concreta, "
+        "identifique estrategias de prospeccao que o "
+        "usuario possa executar.",
+        "",
+        "16. Considere esforco, velocidade para comecar, "
+        "custos, possivel retorno e riscos.",
+        "",
+        "FORMATO DA RESPOSTA:",
+        "",
+        "OBJETIVO",
+        "Resuma objetivo, localizacao, prazo e valor desejado.",
+        "",
+        "OPORTUNIDADES CONCRETAS",
+        "Mostre primeiro as oportunidades com evidencia concreta.",
+        "",
+        "Para cada uma informe:",
+        "- Nome",
+        "- Tipo",
+        "- Classificacao",
+        "- Local",
+        "- Valor",
+        "- O que fazer",
+        "- Requisitos",
+        "- Prazo",
+        "- Pagamento",
+        "- Como entrar",
+        "- Link",
+        "- Por que pode servir",
+        "- Limitacoes",
+        "",
+        "POSSIVEIS OPORTUNIDADES",
+        "Mostre oportunidades interessantes que ainda precisam "
+        "ser confirmadas.",
+        "",
+        "OPORTUNIDADES ONLINE",
+        "Mostre oportunidades remotas concretas ou possiveis.",
+        "",
+        "ESTRATEGIAS DE PROSPECCAO",
+        "Se faltarem oportunidades concretas, apresente "
+        "formas praticas de procurar clientes ou servicos "
+        "na regiao do usuario.",
+        "",
+        "O QUE FAZER AGORA",
+        "Crie uma sequencia pratica de acoes.",
+        "",
+        "PLANO DE EXECUCAO",
+        "Crie um plano para as proximas horas.",
+        "",
+        "MENSAGEM PRONTA",
+        "Se for necessario entrar em contato com clientes "
+        "ou contratantes, crie uma mensagem curta que "
+        "o usuario possa copiar e enviar.",
+        "",
+        "Nao invente informacoes pessoais do usuario.",
+        "",
+        "ALERTAS",
+        "Informe custos, golpes, concorrencia, requisitos, "
+        "deslocamento, prazo de pagamento e riscos.",
+        "",
+        "FONTES",
+        "Liste os links das fontes utilizadas.",
+        "",
+        "REGRA FINAL:",
+        "E melhor dizer que nao foi encontrada uma oportunidade "
+        "concreta verificavel do que inventar uma."
+    ]
 
-Sua função é analisar informações atuais da internet,
-identificar oportunidades concretas e transformar essas
-informações em ações que o usuário possa executar.
+    prompt = "\n".join(prompt_partes)
 
-OBJETIVO DO USUÁRIO:
+    for tentativa in range(3):
 
-{objetivo}
+        try:
 
-LOCALIZAÇÃO:
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=prompt
+            )
 
-{localizacao}
+            return {
+                "objetivo": objetivo,
+                "localizacao": localizacao,
+                "analise": response.text,
+                "fontes": fontes,
+                "status": "sucesso"
+            }
 
-RESULTADOS ATUAIS DA INTERNET:
+        except Exception as erro:
 
-{contexto_web}
+            erro_texto = str(erro)
 
+            if (
+                "503" in erro_texto
+                and tentativa < 2
+            ):
+                time.sleep(3)
+                continue
 
-========================
-REGRAS DE ANÁLISE
-========================
-
-1. Priorize oportunidades que possam realmente ajudar o
-usuário a atingir o objetivo informado.
-
-2. Dê prioridade para oportunidades:
-- locais;
-- de contratação rápida;
-- de curto prazo;
-- freelancer;
-- bicos;
-- diárias;
-- serviços;
-- trabalhos que possam começar rapidamente;
-- oportunidades online que não dependam de localização.
-
-3. Se o usuário informou uma meta de dinheiro e prazo,
-avalie se a oportunidade tem potencial de contribuir
-para essa meta.
-
-4. NÃO invente:
-- vagas;
-- clientes;
-- empresas;
-- valores;
-- contatos;
-- prazos;
-- disponibilidade;
-- requisitos.
-
-5. Não trate uma plataforma como Workana, Fiverr,
-99Freelas, OLX, Indeed etc. como se ela própria fosse
-uma oportunidade concreta.
-
-6. Diferencie claramente:
-- OPORTUNIDADE CONCRETA
-- PLATAFORMA
-- FONTE INFORMATIVA
-- IDEIA DE SERVIÇO
-- ESTIMATIVA
-
-7. Uma oportunidade só deve ser chamada de "concreta"
-quando existir evidência suficiente na fonte apresentada.
-
-8. Se a fonte mostrar uma vaga, anúncio, projeto ou pedido
-específico, use o link original.
-
-9. Não diga que uma vaga ainda está disponível se isso
-não puder ser confirmado.
-
-10. Não prometa ganhos.
-
-11. Não recomende fraude, spam, pirataria, golpes,
-manipulação, atividades ilegais ou qualquer método
-que dependa de enganar outra pessoa.
-
-12. Não recomende pagar para conseguir uma vaga quando
-isso for suspeito.
-
-13. Considere que o usuário está no Brasil.
-
-14. Se não houver oportunidades concretas suficientes,
-seja transparente.
-
-15. Não transforme qualquer resultado de pesquisa em
-uma oportunidade apenas para preencher a resposta.
-
-16. Prefira poucas oportunidades relevantes a uma lista
-grande de resultados ruins.
-
-17. Quando uma oportunidade exigir contato com alguém,
-explique exatamente quem deve ser contatado e por qual
-meio, desde que essa informação esteja disponível na fonte.
-
-18. Quando não houver oportunidade concreta, procure
-também identificar serviços que o usuário poderia oferecer
-na própria região, mas deixe claro que isso é uma estratégia
-de prospecção e não um cliente já encontrado.
-
-19. Considere o esforço necessário, velocidade para começar,
-possível retorno, custos e riscos.
-
-20. Nunca
+            return {
+                "objetivo": objetivo,
+                "localizacao": localizacao,
+                "erro": erro_texto,
+                "status": "erro"
+            }
