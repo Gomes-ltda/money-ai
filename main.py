@@ -11,13 +11,16 @@ HTML = """
 <!DOCTYPE html>
 <html>
 <head>
+
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <title>Money AI</title>
 
     <style>
+
         body {
             font-family: Arial, sans-serif;
-            max-width: 600px;
+            max-width: 700px;
             margin: 40px auto;
             padding: 20px;
         }
@@ -46,7 +49,9 @@ HTML = """
             margin-top: 20px;
             line-height: 1.5;
         }
+
     </style>
+
 </head>
 
 <body>
@@ -57,7 +62,7 @@ HTML = """
 
     <textarea
         id="objetivo"
-        placeholder="Ex.: Encontrar uma oportunidade de negócio"
+        placeholder="Ex.: Encontrar uma oportunidade de negócio online"
     ></textarea>
 
     <p>Localização:</p>
@@ -65,7 +70,7 @@ HTML = """
     <input
         id="localizacao"
         type="text"
-        placeholder="Ex.: Porto Velho, RO"
+        placeholder="Ex.: Brasil"
     >
 
     <br>
@@ -142,6 +147,7 @@ HTML = """
                     "Erro: " + erro;
 
             }
+
         }
 
     </script>
@@ -182,14 +188,11 @@ def ciclo():
 
     agente.localizacao = localizacao
 
-    agente.ciclo_agente()
+    resultado = agente.ciclo_agente()
 
-    return jsonify({
-        "status": "ciclo_executado",
-        "ciclo": agente.ciclo,
-        "objetivo": objetivo,
-        "localizacao": localizacao
-    })
+    return jsonify(
+        resultado
+    )
 
 
 @app.route("/analisar", methods=["POST"])
@@ -220,18 +223,3 @@ def analisar():
         return jsonify({
             "erro": "Informe sua cidade e estado."
         }), 400
-
-    resultado = analisar_oportunidade(
-        objetivo,
-        localizacao
-    )
-
-    return jsonify(resultado)
-
-
-if __name__ == "__main__":
-
-    app.run(
-        host="0.0.0.0",
-        port=5000
-    )
