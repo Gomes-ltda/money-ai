@@ -87,6 +87,9 @@ HTML = """
     <h2>Resultados comerciais</h2>
     <p>Use este painel para registrar o que aconteceu depois de uma abordagem executada.</p>
     <div id="historicoAcoes"></div>
+    <hr>
+    <h2>Pagamentos</h2>
+    <div id="pagamentos"></div>
 
     <script>
         async function executarCiclo() {
@@ -173,6 +176,58 @@ HTML = """
                 }
             } catch (erro) {}
         }
+
+        async function carregarPagamentos() {
+            const resultado = document.getElementById("pagamentos");
+            const token = obterToken();
+            if (!token) return;
+            try {
+                const resposta = await fetch("/pagamentos", {headers: {"Authorization": "Bearer " + token}});
+                const dados = await resposta.json();
+                if (!resposta.ok) {
+                    resultado.innerHTML = "<p>" + (dados.erro || "Não foi possível carregar pagamentos.") + "</p>";
+                    return;
+                }
+                const pagamentos = dados.pagamentos || [];
+                if (!pagamentos.length) {
+                    resultado.innerHTML = "<p>Nenhum pagamento registrado.</p>";
+                    return;
+                }
+                resultado.innerHTML = pagamentos.slice().reverse().slice(0, 20).map(p => {
+                    const valor = Number(p.valor || 0).toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
+                    return "<div style='border:1px solid #ccc;padding:15px;margin:12px 0;border-radius:8px'>" +
+                        "<b>Status:</b> " + (p.status || "-") + "<br>" +
+                        "<b>Valor:</b> " + valor + "<br>" +
+                        "<b>Descrição:</b> " + (p.descricao || "-") + "<br>" +
+                        "<b>Referência:</b> " + (p.referencia || "-") + "<br>" +
+                        "<b>Comprador:</b> " + (p.email_comprador || "-") +
+                        (p.ticket_url ? "<br><a href='" + p.ticket_url + "' target='_blank' rel='noopener'>Abrir cobrança</a>" : "") +
+                        "</div>";
+                }).join("");
+            } catch (erro) {
+                resultado.innerHTML = "<p>Erro ao carregar pagamentos.</p>";
+            }
+        }
+
+        async function carregarHistorico() {
+            const token = obterToken();
+            if (!token) return;
+            try {
+                const resposta = await fetch("/acoes-historico", {headers: {"Authorization": "Bearer " + token}});
+                const dados = await resposta.json();
+                if (!resposta.ok) return;
+                const metricas = dados.metricas || {};
+                document.getElementById("historicoAcoes").innerHTML =
+                    "<p>Ações executadas: " + (metricas.executadas || 0) +
+                    " | Respostas: " + (metricas.respostas || 0) +
+                    " | Interesses: " + (metricas.interesses || 0) +
+                    " | Vendas: " + (metricas.vendas || 0) +
+                    " | Receita confirmada: " +
+                    Number(metricas.receita_confirmada || 0).toLocaleString("pt-BR", {style:"currency", currency:"BRL"}) +
+                    "</p>";
+            } catch (erro) {}
+        }
+
         let intervaloAcoes = null;
         function iniciarAtualizacaoAutomatica() {
             if (intervaloAcoes) clearInterval(intervaloAcoes);
@@ -180,11 +235,13 @@ HTML = """
                 carregarAcoes();
                 carregarAcoesEmAndamento();
                 carregarHistorico();
+                carregarPagamentos();
                 intervaloAcoes = setInterval(() => {
                     if (obterToken()) {
                         carregarAcoes();
                         carregarAcoesEmAndamento();
                         carregarHistorico();
+                        carregarPagamentos();
                     }
                 }, 10000);
             }
