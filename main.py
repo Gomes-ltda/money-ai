@@ -154,13 +154,30 @@ HTML = """
             document.getElementById("statusAcao").textContent = dados.mensagem || JSON.stringify(dados);
             carregarAcoes();
         }
+        async function carregarAcoesEmAndamento() {
+            const token = obterToken();
+            if (!token) return;
+            try {
+                const resposta = await fetch("/acoes-em-andamento", {headers: {"Authorization": "Bearer " + token}});
+                if (!resposta.ok) return;
+                const dados = await resposta.json();
+                const emAndamento = dados.acoes || [];
+                if (emAndamento.length > 0) {
+                    document.getElementById("statusAcao").textContent = "Há " + emAndamento.length + " ação(ões) externa(s) em execução. A Evolia está acompanhando o resultado."; 
+                }
+            } catch (erro) {}
+        }
         let intervaloAcoes = null;
         function iniciarAtualizacaoAutomatica() {
             if (intervaloAcoes) clearInterval(intervaloAcoes);
             if (obterToken()) {
                 carregarAcoes();
+                carregarAcoesEmAndamento();
                 intervaloAcoes = setInterval(() => {
-                    if (obterToken()) carregarAcoes();
+                    if (obterToken()) {
+                        carregarAcoes();
+                        carregarAcoesEmAndamento();
+                    }
                 }, 10000);
             }
         }
@@ -183,6 +200,15 @@ def health():
         "status": "online",
         "nome": "Evolia AI"
     })
+
+
+@app.route("/acoes-em-andamento")
+def acoes_em_andamento():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    acoes = obter_acoes_externas(status="executando", limite=50)
+    resultados = [consultar_acao_externa(acao.get("id")) for acao in acoes]
+    return jsonify({"acoes": resultados})
 
 
 @app.route("/acoes-pendentes")
