@@ -314,6 +314,21 @@ def registrar_feedback_acao_externa(acao_id, resposta=None, interesse=None, vend
 
 
 
+def validar_venda_para_cobranca(acao_id):
+    memoria = carregar_memoria()
+    for acao in reversed(memoria["acoes_externas"]):
+        if acao.get("id") == acao_id:
+            if acao.get("status") != "executada":
+                return {"ok": False, "motivo": "A ação comercial ainda não foi executada."}
+            feedbacks = acao.get("feedback", []) or []
+            venda = next((x for x in reversed(feedbacks) if bool(x.get("venda"))), None)
+            if not venda:
+                return {"ok": False, "motivo": "A venda ainda não foi confirmada para esta ação."}
+            return {"ok": True, "acao": acao, "feedback": venda}
+    return {"ok": False, "motivo": "Ação externa não encontrada."}
+
+
+
 def registrar_pagamento(pagamento):
     memoria = carregar_memoria()
     pagamentos = memoria["pagamentos"]
