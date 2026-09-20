@@ -31,10 +31,12 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None):
         return {"status": "erro", "erro": "O valor deve ser maior que zero."}
 
     email = (email or "").strip().lower()
-    if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", email):
+    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
         return {"status": "erro", "erro": "Informe um e-mail válido do comprador para criar a cobrança Pix."}
 
-    referencia = referencia or uuid.uuid4().hex
+    referencia = (referencia or uuid.uuid4().hex).strip()
+    if len(referencia) > 64:
+        return {"status": "erro", "erro": "A referência deve ter no máximo 64 caracteres."}
     existente = next((x for x in obter_pagamentos() if x.get("referencia") == referencia), None)
     if existente:
         return {"status": "ja_existente", "pagamento": existente}
@@ -160,7 +162,7 @@ def processar_webhook(payload, data_id):
         webhook_recebido_em=agora()
     )
 
-    if action in {"order.processed", "payment.updated"}:
+    if action in {"order.processed", "order.updated", "payment.updated"}:
         order = consultar_order(pagamento_id)
         status_order = (order or {}).get("status")
         status_detail = (order or {}).get("status_detail")
