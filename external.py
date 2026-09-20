@@ -1,7 +1,7 @@
 import os
 import requests
 
-from memory import agora, atualizar_acao_externa, obter_acoes_externas, registrar_evento
+from memory import agora, atualizar_acao_externa, obter_acoes_externas, registrar_evento, registrar_aprendizado
 
 
 TINYFISH_API_KEY = os.getenv("TINYFISH_API_KEY")
@@ -176,6 +176,17 @@ def consultar_acao_externa(acao_id):
                 "consultado_em": agora()
             })
             registrar_evento("acao_externa_finalizada", f"Ação externa {acao_id} terminou com status {novo_status}.")
+            if novo_status == "executada":
+                estrategia = acao.get("estrategia")
+                registrar_aprendizado(
+                    "A abordagem externa foi enviada com sucesso; conversão e receita ainda não foram confirmadas.",
+                    estrategia=estrategia,
+                    evidencias=[{"acao_externa_id": acao_id, "resultado": resultado}],
+                    impacto="envio_confirmado_sem_receita_confirmada",
+                    acao="aguardar_feedback",
+                    confianca="alta",
+                    recomendacao="não contabilizar receita até existir evidência de resposta, venda ou pagamento"
+                )
             return {"status": novo_status, "acao_id": acao_id, "run_id": run_id, "resultado": resultado}
 
         if status in {"FAILED", "CANCELLED"}:
