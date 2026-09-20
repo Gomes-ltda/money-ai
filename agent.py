@@ -1,7 +1,8 @@
 from memory import (
     registrar_ciclo,
     registrar_resultado,
-    registrar_aprendizado
+    registrar_aprendizado,
+    obter_ultimos_aprendizados
 )
 
 
@@ -30,13 +31,20 @@ class MoneyAgent:
         objetivo = objetivo or self.objetivo
         localizacao = localizacao or self.localizacao
 
-        # 1. Cérebro pesquisa e analisa
+        # 1. Carrega aprendizados anteriores
+        try:
+            memoria = obter_ultimos_aprendizados(10)
+        except Exception:
+            memoria = []
+
+        # 2. Cérebro pesquisa, analisa e considera memória
         analise = analisar_oportunidade(
             objetivo,
-            localizacao
+            localizacao,
+            contexto_memoria=memoria
         )
 
-        # 2. Verifica erro
+        # 3. Verifica erro
         if analise.get("status") == "erro":
 
             medicao = {
@@ -63,7 +71,7 @@ class MoneyAgent:
                 "ciclo_memoria": ciclo
             }
 
-        # 3. Extrai decisão estruturada
+        # 4. Extrai decisão estruturada
         decisao_ia = analise.get(
             "decisao",
             {}
@@ -105,7 +113,7 @@ class MoneyAgent:
             False
         )
 
-        # 4. Sem estratégia válida
+        # 5. Sem estratégia válida
         if not estrategia:
 
             decisao = {
@@ -119,7 +127,7 @@ class MoneyAgent:
                 "analise": analise
             }
 
-        # 5. Próxima ação exige permissão
+        # 6. Próxima ação exige permissão
         elif precisa_permissao:
 
             consulta = (
@@ -156,7 +164,7 @@ class MoneyAgent:
                 )
             }
 
-        # 6. Ação segura
+        # 7. Ação segura
         else:
 
             decisao = {
@@ -176,12 +184,12 @@ class MoneyAgent:
                 )
             }
 
-        # 7. Executa
+        # 8. Executa
         execucao = executar(
             decisao
         )
 
-        # 8. Mede resultado
+        # 9. Mede resultado
         receita = 0
         custo = 0
 
@@ -222,7 +230,7 @@ class MoneyAgent:
             )
         }
 
-        # 9. Registra resultado
+        # 10. Registra resultado
         if estrategia:
 
             registrar_resultado(
@@ -248,7 +256,7 @@ class MoneyAgent:
                 )
             )
 
-        # 10. Salva ciclo
+        # 11. Salva ciclo completo
         ciclo = registrar_ciclo(
             objetivo=objetivo,
             localizacao=localizacao,
@@ -264,6 +272,7 @@ class MoneyAgent:
         return {
             "status": "sucesso",
             "ciclo": self.ciclo,
+            "memoria_utilizada": memoria,
             "decisao_ia": analise,
             "decisao": decisao,
             "execucao": execucao,
