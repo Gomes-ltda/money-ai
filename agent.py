@@ -16,7 +16,7 @@ ACOES_PERMITIDAS = {
     "criar_proposta", "criar_conteudo", "pesquisar_alvo", "preparar_abordagem", "testar_estrategia"
 }
 
-MAX_TAREFAS_POR_CICLO = 5
+MAX_TAREFAS_POR_CICLO = 6
 
 
 def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
