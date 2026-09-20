@@ -3,7 +3,7 @@ import os
 
 from ai import analisar_oportunidade
 from agent import executar_ciclo
-from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa
+from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
 
 
@@ -81,6 +81,10 @@ HTML = """
     <input id="tokenAutorizacao" type="password" placeholder="Token de autorização">
     <button onclick="carregarAcoes()">Carregar ações</button>
     <div id="acoes"></div>
+    <hr>
+    <h2>Resultados comerciais</h2>
+    <p>Use este painel para registrar o que aconteceu depois de uma abordagem executada.</p>
+    <div id="historicoAcoes"></div>
 
     <script>
         async function executarCiclo() {
@@ -173,10 +177,12 @@ HTML = """
             if (obterToken()) {
                 carregarAcoes();
                 carregarAcoesEmAndamento();
+                carregarHistorico();
                 intervaloAcoes = setInterval(() => {
                     if (obterToken()) {
                         carregarAcoes();
                         carregarAcoesEmAndamento();
+                        carregarHistorico();
                     }
                 }, 10000);
             }
@@ -259,6 +265,18 @@ def decidir_acao(acao_id, decisao):
 
     atualizar_acao_externa(acao_id, "cancelada", {"origem": "interface_usuario"})
     return jsonify({"status": "cancelada", "mensagem": "Ação recusada e cancelada."})
+
+
+@app.route("/acoes-historico")
+def acoes_historico():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    acoes = obter_acoes_externas(limite=100)
+    concluidas = [x for x in acoes if x.get("status") in {"executada", "falhou", "cancelada"}]
+    return jsonify({
+        "acoes": concluidas[-30:],
+        "metricas": obter_metricas_comerciais()
+    })
 
 
 @app.route("/acoes/<acao_id>/feedback", methods=["POST"])
