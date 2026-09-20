@@ -21,6 +21,7 @@ def memoria_padrao():
         "testes": [],
         "tarefas": [],
         "aprendizados": [],
+        "acoes_externas": [],
         "financeiro": {
             "receita": 0,
             "custos": 0
@@ -39,13 +40,13 @@ def garantir_estrutura(memoria):
             memoria[chave] = valor
 
     if not isinstance(memoria.get("financeiro"), dict):
-        memoria["financeiro"] = {
-            "receita": 0,
-            "custos": 0
-        }
+        memoria["financeiro"] = {"receita": 0, "custos": 0}
 
     memoria["financeiro"].setdefault("receita", 0)
     memoria["financeiro"].setdefault("custos", 0)
+
+    if not isinstance(memoria.get("acoes_externas"), list):
+        memoria["acoes_externas"] = []
 
     return memoria
 
@@ -59,28 +60,22 @@ def _usar_banco():
 
 
 def _conectar():
-    return psycopg.connect(
-        DATABASE_URL,
-        connect_timeout=10
-    )
+    return psycopg.connect(DATABASE_URL, connect_timeout=10)
 
 
 def _inicializar_banco():
     if not _usar_banco():
         return False
-
     try:
         with _conectar() as conexao:
             with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
+                cursor.execute("""
                     CREATE TABLE IF NOT EXISTS evolia_memory (
                         id INTEGER PRIMARY KEY,
                         data JSONB NOT NULL,
                         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
-                    """
-                )
+                """)
         return True
     except Exception:
         return False
@@ -89,26 +84,18 @@ def _inicializar_banco():
 def _carregar_banco():
     if not _inicializar_banco():
         return None
-
     try:
         with _conectar() as conexao:
             with conexao.cursor() as cursor:
-                cursor.execute(
-                    "SELECT data FROM evolia_memory WHERE id = 1"
-                )
+                cursor.execute("SELECT data FROM evolia_memory WHERE id = 1")
                 linha = cursor.fetchone()
 
         if linha:
             return garantir_estrutura(linha[0])
 
-        # Migra a memória JSON existente apenas na primeira inicialização.
         if os.path.exists(ARQUIVO_MEMORIA):
             try:
-                with open(
-                    ARQUIVO_MEMORIA,
-                    "r",
-                    encoding="utf-8"
-                ) as arquivo:
+                with open(ARQUIVO_MEMORIA, "r", encoding="utf-8") as arquivo:
                     memoria = garantir_estrutura(json.load(arquivo))
             except Exception:
                 memoria = memoria_padrao()
@@ -117,7 +104,6 @@ def _carregar_banco():
 
         _salvar_banco(memoria)
         return memoria
-
     except Exception:
         return None
 
@@ -125,23 +111,16 @@ def _carregar_banco():
 def _salvar_banco(memoria):
     if not _inicializar_banco():
         return False
-
     try:
         memoria = garantir_estrutura(memoria)
-
         with _conectar() as conexao:
             with conexao.cursor() as cursor:
-                cursor.execute(
-                    """
+                cursor.execute("""
                     INSERT INTO evolia_memory (id, data, updated_at)
                     VALUES (1, %s, NOW())
                     ON CONFLICT (id)
-                    DO UPDATE SET
-                        data = EXCLUDED.data,
-                        updated_at = NOW()
-                    """,
-                    (json.dumps(memoria, ensure_ascii=False),)
-                )
+                    DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+                """, (json.dumps(memoria, ensure_ascii=False),))
         return True
     except Exception:
         return False
@@ -149,7 +128,6 @@ def _salvar_banco(memoria):
 
 def carregar_memoria():
     memoria_banco = _carregar_banco()
-
     if memoria_banco is not None:
         return memoria_banco
 
@@ -159,203 +137,85 @@ def carregar_memoria():
         return memoria
 
     try:
-        with open(
-            ARQUIVO_MEMORIA,
-            "r",
-            encoding="utf-8"
-        ) as arquivo:
-            memoria = json.load(arquivo)
-
-        return garantir_estrutura(memoria)
-
+        with open(ARQUIVO_MEMORIA, "r", encoding="utf-8") as arquivo:
+            return garantir_estrutura(json.load(arquivo))
     except Exception:
         return memoria_padrao()
 
 
 def salvar_memoria(memoria):
     memoria = garantir_estrutura(memoria)
-
     if _usar_banco() and _salvar_banco(memoria):
         return
+    with open(ARQUIVO_MEMORIA, "w", encoding="utf-8") as arquivo:
+        json.dump(memoria, arquivo, ensure_ascii=False, indent=4)
 
-    with open(
-        ARQUIVO_MEMORIA,
-        "w",
-        encoding="utf-8"
-    ) as arquivo:
-        json.dump(
-            memoria,
-            arquivo,
-            ensure_ascii=False,
-            indent=4
-        )
-
-
-# =========================================================
-# EVENTOS
-# =========================================================
 
 def registrar_evento(tipo, descricao):
     memoria = carregar_memoria()
-
-    evento = {
-        "data": agora(),
-        "tipo": tipo,
-        "descricao": descricao
-    }
-
+    evento = {"data": agora(), "tipo": tipo, "descricao": descricao}
     memoria["eventos"].append(evento)
     salvar_memoria(memoria)
-
     return evento
 
 
-# =========================================================
-# RESULTADOS FINANCEIROS
-# =========================================================
-
-def registrar_resultado(
-    estrategia,
-    receita=0,
-    custo=0,
-    resultado=None,
-    acao=None,
-    evidencias=None
-):
+def registrar_resultado(estrategia, receita=0, custo=0, resultado=None, acao=None, evidencias=None):
     memoria = carregar_memoria()
-
     if resultado is None:
         resultado = receita - custo
-
     registro = {
-        "data": agora(),
-        "estrategia": estrategia,
-        "acao": acao,
-        "receita": receita,
-        "custo": custo,
-        "resultado": resultado,
+        "data": agora(), "estrategia": estrategia, "acao": acao,
+        "receita": receita, "custo": custo, "resultado": resultado,
         "evidencias": evidencias or []
     }
-
     memoria["resultados"].append(registro)
     memoria["financeiro"]["receita"] += receita
     memoria["financeiro"]["custos"] += custo
-
     salvar_memoria(memoria)
-
     return registro
 
 
-# =========================================================
-# ESTRATÉGIAS
-# =========================================================
-
 def registrar_estrategia(nome, descricao, status="em_teste"):
     memoria = carregar_memoria()
-
-    estrategia = {
-        "data": agora(),
-        "nome": nome,
-        "descricao": descricao,
-        "status": status
-    }
-
+    estrategia = {"data": agora(), "nome": nome, "descricao": descricao, "status": status}
     memoria["estrategias"].append(estrategia)
     salvar_memoria(memoria)
-
     return estrategia
 
 
-# =========================================================
-# CICLOS
-# =========================================================
-
-def registrar_ciclo(
-    objetivo,
-    localizacao=None,
-    pesquisa=None,
-    analise=None,
-    decisao=None,
-    execucao=None,
-    medicao=None
-):
+def registrar_ciclo(objetivo, localizacao=None, pesquisa=None, analise=None, decisao=None, execucao=None, medicao=None):
     memoria = carregar_memoria()
-
     ciclo = {
-        "data": agora(),
-        "objetivo": objetivo,
-        "localizacao": localizacao,
-        "pesquisa": pesquisa,
-        "analise": analise,
-        "decisao": decisao,
-        "execucao": execucao,
-        "medicao": medicao
+        "data": agora(), "objetivo": objetivo, "localizacao": localizacao,
+        "pesquisa": pesquisa, "analise": analise, "decisao": decisao,
+        "execucao": execucao, "medicao": medicao
     }
-
     memoria["ciclos"].append(ciclo)
     salvar_memoria(memoria)
-
     return ciclo
 
 
-# =========================================================
-# TESTES
-# =========================================================
-
-def registrar_teste(
-    estrategia,
-    plano=None,
-    restricoes=None,
-    execucao=None,
-    receita=0,
-    custo=0,
-    resultado=None,
-    status="em_andamento",
-    ciclo=None
-):
+def registrar_teste(estrategia, plano=None, restricoes=None, execucao=None, receita=0, custo=0, resultado=None, status="em_andamento", ciclo=None):
     memoria = carregar_memoria()
-
     if resultado is None:
         resultado = receita - custo
-
     teste = {
-        "data": agora(),
-        "ciclo": ciclo,
-        "estrategia": estrategia,
-        "plano": plano or {},
-        "restricoes": restricoes or {},
-        "execucao": execucao or {},
-        "financeiro": {
-            "receita": receita,
-            "custo": custo,
-            "resultado": resultado
-        },
+        "data": agora(), "ciclo": ciclo, "estrategia": estrategia,
+        "plano": plano or {}, "restricoes": restricoes or {}, "execucao": execucao or {},
+        "financeiro": {"receita": receita, "custo": custo, "resultado": resultado},
         "status": status
     }
-
     memoria["testes"].append(teste)
     salvar_memoria(memoria)
-
     return teste
 
 
-# =========================================================
-# TAREFAS
-# =========================================================
-
 def registrar_tarefa(tarefa_id, descricao, acao, status="pendente", resultado=None, ciclo=None):
     memoria = carregar_memoria()
-
     tarefa = {
-        "data": agora(),
-        "id": tarefa_id,
-        "descricao": descricao,
-        "acao": acao,
-        "status": status,
-        "resultado": resultado,
-        "ciclo": ciclo
+        "data": agora(), "id": tarefa_id, "descricao": descricao,
+        "acao": acao, "status": status, "resultado": resultado, "ciclo": ciclo
     }
-
     memoria["tarefas"].append(tarefa)
     salvar_memoria(memoria)
     return tarefa
@@ -363,7 +223,6 @@ def registrar_tarefa(tarefa_id, descricao, acao, status="pendente", resultado=No
 
 def atualizar_tarefa(tarefa_id, status, resultado=None):
     memoria = carregar_memoria()
-
     for tarefa in reversed(memoria["tarefas"]):
         if tarefa.get("id") == tarefa_id:
             tarefa["status"] = status
@@ -372,174 +231,148 @@ def atualizar_tarefa(tarefa_id, status, resultado=None):
             tarefa["atualizada_em"] = agora()
             salvar_memoria(memoria)
             return tarefa
-
     return None
 
 
-# =========================================================
-# APRENDIZADO
-# =========================================================
-
-def registrar_aprendizado(
-    aprendizado,
-    estrategia=None,
-    evidencias=None,
-    impacto=None,
-    acao=None,
-    confianca=None,
-    recomendacao=None
-):
+def registrar_aprendizado(aprendizado, estrategia=None, evidencias=None, impacto=None, acao=None, confianca=None, recomendacao=None):
     memoria = carregar_memoria()
-
     registro = {
-        "data": agora(),
-        "aprendizado": aprendizado,
-        "estrategia": estrategia,
-        "acao": acao,
-        "evidencias": evidencias or [],
-        "impacto": impacto,
-        "confianca": confianca,
-        "recomendacao": recomendacao
+        "data": agora(), "aprendizado": aprendizado, "estrategia": estrategia,
+        "acao": acao, "evidencias": evidencias or [], "impacto": impacto,
+        "confianca": confianca, "recomendacao": recomendacao
     }
-
     memoria["aprendizados"].append(registro)
     salvar_memoria(memoria)
-
     return registro
 
 
-# =========================================================
-# HISTÓRICO DE UMA ESTRATÉGIA
-# =========================================================
+def registrar_acao_externa(tipo, alvo=None, canal=None, mensagem=None, estrategia=None, contexto=None):
+    memoria = carregar_memoria()
+    acao = {
+        "id": __import__("uuid").uuid4().hex,
+        "data": agora(),
+        "tipo": tipo,
+        "alvo": alvo,
+        "canal": canal,
+        "mensagem": mensagem,
+        "estrategia": estrategia,
+        "contexto": contexto or {},
+        "status": "aguardando_autorizacao",
+        "autorizada_em": None,
+        "executada_em": None,
+        "resultado": None
+    }
+    memoria["acoes_externas"].append(acao)
+    salvar_memoria(memoria)
+    return acao
+
+
+def atualizar_acao_externa(acao_id, status, resultado=None):
+    memoria = carregar_memoria()
+    for acao in reversed(memoria["acoes_externas"]):
+        if acao.get("id") == acao_id:
+            acao["status"] = status
+            if status == "autorizada":
+                acao["autorizada_em"] = agora()
+            if status in {"executada", "falhou", "cancelada"}:
+                acao["executada_em"] = agora()
+            if resultado is not None:
+                acao["resultado"] = resultado
+            salvar_memoria(memoria)
+            return acao
+    return None
+
+
+def obter_acoes_externas(status=None, limite=20):
+    memoria = carregar_memoria()
+    acoes = memoria["acoes_externas"]
+    if status:
+        acoes = [acao for acao in acoes if acao.get("status") == status]
+    return acoes[-limite:]
+
 
 def obter_historico_estrategia(estrategia):
     memoria = carregar_memoria()
-
-    resultados = [
-        registro
-        for registro in memoria["resultados"]
-        if registro.get("estrategia") == estrategia
-    ]
-
-    testes = [
-        teste
-        for teste in memoria["testes"]
-        if teste.get("estrategia") == estrategia
-    ]
-
-    aprendizados = [
-        aprendizado
-        for aprendizado in memoria["aprendizados"]
-        if aprendizado.get("estrategia") == estrategia
-    ]
-
     return {
         "estrategia": estrategia,
-        "resultados": resultados,
-        "testes": testes,
-        "aprendizados": aprendizados
+        "resultados": [x for x in memoria["resultados"] if x.get("estrategia") == estrategia],
+        "testes": [x for x in memoria["testes"] if x.get("estrategia") == estrategia],
+        "aprendizados": [x for x in memoria["aprendizados"] if x.get("estrategia") == estrategia]
     }
 
 
-# =========================================================
-# ÚLTIMOS APRENDIZADOS
-# =========================================================
-
 def obter_ultimos_aprendizados(limite=10):
-    memoria = carregar_memoria()
-    return memoria["aprendizados"][-limite:]
+    return carregar_memoria()["aprendizados"][-limite:]
 
 
 def avaliar_estrategias(limite_resultados=50):
-    """Calcula estados objetivos das estratégias com base em resultados registrados."""
     memoria = carregar_memoria()
     resultados = memoria["resultados"][-limite_resultados:]
-
     agrupadas = {}
     for item in resultados:
         nome = item.get("estrategia") or "estratégia_sem_nome"
-        grupo = agrupadas.setdefault(nome, [])
-        grupo.append(item)
+        agrupadas.setdefault(nome, []).append(item)
 
     avaliadas = {}
     for nome, itens in agrupadas.items():
         receitas = [float(x.get("receita", 0) or 0) for x in itens]
         custos = [float(x.get("custo", 0) or 0) for x in itens]
-        resultados_financeiros = [float(x.get("resultado", 0) or 0) for x in itens]
-        positivos = sum(1 for x in resultados_financeiros if x > 0)
-        negativos = sum(1 for x in resultados_financeiros if x < 0)
-        zeros = sum(1 for x in resultados_financeiros if x == 0)
-
-        consecutivos_sem_resultado = 0
-        for valor in reversed(resultados_financeiros):
+        valores = [float(x.get("resultado", 0) or 0) for x in itens]
+        positivos = sum(1 for x in valores if x > 0)
+        negativos = sum(1 for x in valores if x < 0)
+        zeros = sum(1 for x in valores if x == 0)
+        consecutivos = 0
+        for valor in reversed(valores):
             if valor <= 0:
-                consecutivos_sem_resultado += 1
+                consecutivos += 1
             else:
                 break
-
-        total_receita = sum(receitas)
-        total_custo = sum(custos)
-        total_resultado = sum(resultados_financeiros)
+        total_receita, total_custo, total_resultado = sum(receitas), sum(custos), sum(valores)
 
         if positivos > 0 and total_resultado > 0:
-            estado = "sinal_positivo"
-            recomendacao = "continuar"
-        elif len(itens) >= 3 and consecutivos_sem_resultado >= 3:
-            estado = "sinal_negativo"
-            recomendacao = "modificar"
+            estado, recomendacao = "sinal_positivo", "continuar"
+        elif len(itens) >= 3 and consecutivos >= 3:
+            estado, recomendacao = "sinal_negativo", "modificar"
         elif len(itens) >= 2 and negativos > 0 and total_resultado < 0:
-            estado = "sinal_negativo"
-            recomendacao = "modificar"
+            estado, recomendacao = "sinal_negativo", "modificar"
         else:
-            estado = "em_teste"
-            recomendacao = "testar_mais"
+            estado, recomendacao = "em_teste", "testar_mais"
 
         avaliadas[nome] = {
-            "tentativas": len(itens),
-            "receita_total": total_receita,
-            "custo_total": total_custo,
-            "resultado_total": total_resultado,
-            "resultados_positivos": positivos,
-            "resultados_negativos": negativos,
+            "tentativas": len(itens), "receita_total": total_receita,
+            "custo_total": total_custo, "resultado_total": total_resultado,
+            "resultados_positivos": positivos, "resultados_negativos": negativos,
             "resultados_zero": zeros,
-            "tentativas_consecutivas_sem_resultado_positivo": consecutivos_sem_resultado,
-            "ultimo_resultado": resultados_financeiros[-1],
-            "estado": estado,
+            "tentativas_consecutivas_sem_resultado_positivo": consecutivos,
+            "ultimo_resultado": valores[-1], "estado": estado,
             "recomendacao": recomendacao
         }
-
     return avaliadas
 
 
 def obter_contexto_estrategico(limite_resultados=10, limite_testes=10, limite_aprendizados=10):
-    """Retorna evidências recentes e avaliação objetiva das estratégias."""
     memoria = carregar_memoria()
-
-    resultados = memoria["resultados"][-limite_resultados:]
-    testes = memoria["testes"][-limite_testes:]
-    aprendizados = memoria["aprendizados"][-limite_aprendizados:]
-
+    resultados, testes, aprendizados = (
+        memoria["resultados"][-limite_resultados:],
+        memoria["testes"][-limite_testes:],
+        memoria["aprendizados"][-limite_aprendizados:]
+    )
     estrategias = {}
     for item in resultados:
         nome = item.get("estrategia") or "estratégia_sem_nome"
         atual = estrategias.setdefault(nome, {
-            "quantidade_resultados": 0,
-            "receita_total": 0,
-            "custo_total": 0,
-            "resultado_total": 0,
-            "ultimos_resultados": []
+            "quantidade_resultados": 0, "receita_total": 0,
+            "custo_total": 0, "resultado_total": 0, "ultimos_resultados": []
         })
         atual["quantidade_resultados"] += 1
         atual["receita_total"] += item.get("receita", 0) or 0
         atual["custo_total"] += item.get("custo", 0) or 0
         atual["resultado_total"] += item.get("resultado", 0) or 0
         atual["ultimos_resultados"].append({
-            "data": item.get("data"),
-            "resultado": item.get("resultado", 0),
+            "data": item.get("data"), "resultado": item.get("resultado", 0),
             "acao": item.get("acao")
         })
         atual["ultimos_resultados"] = atual["ultimos_resultados"][-3:]
-
     return {
         "desempenho_por_estrategia": estrategias,
         "avaliacao_de_estrategias": avaliar_estrategias(),
@@ -547,26 +380,19 @@ def obter_contexto_estrategico(limite_resultados=10, limite_testes=10, limite_ap
         "aprendizados_recentes": aprendizados
     }
 
-# =========================================================
-# RESUMO FINANCEIRO
-# =========================================================
 
 def obter_resumo():
     memoria = carregar_memoria()
-
     receita = memoria["financeiro"]["receita"]
     custos = memoria["financeiro"]["custos"]
-    lucro = receita - custos
-
     return {
-        "receita_total": receita,
-        "custos_total": custos,
-        "resultado_total": lucro,
-        "eventos": len(memoria["eventos"]),
-        "estrategias": len(memoria["estrategias"]),
-        "resultados": len(memoria["resultados"]),
-        "ciclos": len(memoria["ciclos"]),
-        "testes": len(memoria["testes"]),
-        "tarefas": len(memoria["tarefas"]),
-        "aprendizados": len(memoria["aprendizados"])
+        "receita_total": receita, "custos_total": custos,
+        "resultado_total": receita - custos,
+        "eventos": len(memoria["eventos"]), "estrategias": len(memoria["estrategias"]),
+        "resultados": len(memoria["resultados"]), "ciclos": len(memoria["ciclos"]),
+        "testes": len(memoria["testes"]), "tarefas": len(memoria["tarefas"]),
+        "aprendizados": len(memoria["aprendizados"]),
+        "acoes_externas": len(memoria["acoes_externas"]),
+        "acoes_externas_pendentes": len([x for x in memoria["acoes_externas"] if x.get("status") == "aguardando_autorizacao"])
     }
+}
