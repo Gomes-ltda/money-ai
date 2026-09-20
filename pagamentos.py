@@ -85,6 +85,22 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None):
         return {"status": "erro", "erro": str(erro)}
 
 
+def consultar_order(order_id):
+    if not MP_ACCESS_TOKEN or not order_id:
+        return None
+    try:
+        resposta = requests.get(
+            f"{MP_API}/v1/orders/{order_id}",
+            headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"},
+            timeout=20
+        )
+        if not resposta.ok:
+            return None
+        return resposta.json()
+    except Exception:
+        return None
+
+
 def validar_webhook(headers, data_id):
     if not MP_WEBHOOK_SECRET:
         return False
@@ -135,17 +151,34 @@ def processar_webhook(payload, data_id):
     )
 
     if action in {"order.processed", "payment.updated"}:
-        atualizar_pagamento(pagamento_id, status="pago")
+        order = consultar_order(pagamento_id)
+        status_order = (order or {}).get("status")
+        status_detail = (order or {}).get("status_detail")
+        pagamentos = ((order or {}).get("transactions") or {}).get("payments") or []
+        status_pagamento = pagamentos[0].get("status") if pagamentos else None
 
-        if not existente.get("receita_registrada"):
-            registrar_resultado(
-                estrategia=existente.get("estrategia") or "venda via pagamento",
-                receita=float(existente.get("valor", 0) or 0),
-                custo=0,
-                resultado=float(existente.get("valor", 0) or 0),
-                acao="pagamento_confirmado",
-                evidencias=[{"pagamento_id": pagamento_id, "evento": payload}]
+        confirmado = (
+            status_order == "processed"
+            or status_pagamento in {"approved", "processed"}
+        )
+
+        if confirmado:
+            atualizar_pagamento(
+                pagamento_id,
+                status="pago",
+                status_provedor=status_order or status_pagamento,
+                status_detail=status_detail
             )
-            atualizar_pagamento(pagamento_id, receita_registrada=True)
+
+            if not existente.get("receita_registrada"):
+                registrar_resultado(
+                    estrategia=existente.get("estrategia") or "venda via pagamento",
+                    receita=float(existente.get("valor", 0) or 0),
+                    custo=0,
+                    resultado=float(existente.get("valor", 0) or 0),
+                    acao="pagamento_confirmado",
+                    evidencias=[{"pagamento_id": pagamento_id, "evento": payload, "order": order}]
+                )
+                atualizar_pagamento(pagamento_id, receita_registrada=True)
 
     return {"status": "processado", "pagamento": atualizado or existente}
