@@ -68,6 +68,44 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
             "ciclo_memoria": ciclo
         }
 
+    # Em modo degradado, não propagar uma decisão incompleta para etapas comerciais.
+    if decisao_ia.get("status") == "modo_degradado":
+        detalhes_degradados = decisao_ia.get("decisao", {}) or {}
+        decisao_degradada = _montar_decisao(
+            detalhes_degradados,
+            detalhes_degradados.get("acao_executor", "pesquisar"),
+            objetivo,
+            localizacao,
+            "Modo degradado: pesquisa registrada, mas etapas dependentes de decisão estruturada foram interrompidas."
+        )
+        executor_degradado = Executor()
+        resultado_pesquisa = executor_degradado.executar(decisao_degradada)
+        execucao_degradada = {
+            "status": "modo_degradado",
+            "acao": decisao_degradada["acao"],
+            "tarefas_planejadas": [],
+            "tarefas_executadas": 1,
+            "execucoes": [resultado_pesquisa]
+        }
+        ciclo = registrar_ciclo(
+            objetivo=objetivo, localizacao=localizacao,
+            pesquisa=resultado_pesquisa.get("resultado", {}).get("resultados") if isinstance(resultado_pesquisa, dict) else None,
+            analise=decisao_ia, decisao=decisao_degradada,
+            execucao=execucao_degradada,
+            medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "modo_degradado"}
+        )
+        return {
+            "status": "modo_degradado",
+            "objetivo": objetivo,
+            "localizacao": localizacao,
+            "decisao_ia": decisao_ia,
+            "decisao": decisao_degradada,
+            "tarefas": [],
+            "execucao": execucao_degradada,
+            "medicao": {"receita": 0, "custo": 0, "resultado": 0, "status": "modo_degradado"},
+            "ciclo_memoria": ciclo
+        }
+
     detalhes = decisao_ia.get("decisao", {})
     acao_inicial = detalhes.get("acao_executor", decisao_ia.get("acao_executor"))
 
