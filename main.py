@@ -367,6 +367,20 @@ def status_acao(acao_id):
     return jsonify(consultar_acao_externa(acao_id))
 
 
+@app.route("/pagamentos/<pagamento_id>", methods=["GET"])
+def pagamento_detalhe(pagamento_id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    if not verificar_token_aprovacao(token):
+        return jsonify({"erro": "Não autorizado."}), 401
+
+    pagamentos = obter_pagamentos(limite=200)
+    pagamento = next((p for p in pagamentos if p.get("id") == pagamento_id), None)
+    if not pagamento:
+        return jsonify({"erro": "Pagamento não encontrado."}), 404
+
+    return jsonify({"pagamento": pagamento})
+
+
 @app.route("/pagamentos", methods=["GET"])
 def listar_pagamentos():
     if not validar_token():
