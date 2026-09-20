@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 
 from pesquisa import pesquisar_varias
-from memory import obter_ultimos_aprendizados
+from memory import obter_ultimos_aprendizados, obter_contexto_estrategico
 
 
 GEMINI_API_KEY = os.getenv(
@@ -111,9 +111,9 @@ def analisar_oportunidade(
     # =========================================================
 
     if contexto_memoria is None:
-        contexto_memoria = obter_ultimos_aprendizados(
-            10
-        )
+        contexto_memoria = obter_ultimos_aprendizados(10)
+
+    contexto_estrategico = obter_contexto_estrategico()
 
     # =========================================================
     # 2. PESQUISA
@@ -170,6 +170,11 @@ LOCALIZAÇÃO:
 
 MEMÓRIA DE APRENDIZADOS ANTERIORES:
 {memoria_texto}
+
+DESEMPENHO E RESULTADOS DOS TESTES:
+{json.dumps(contexto_estrategico, ensure_ascii=False, indent=2)}
+
+Use o desempenho acima como evidência. Estratégias sem resultado financeiro positivo não devem ser tratadas como validadas. Resultados zero significam que ainda não houve receita real. Se uma estratégia tiver evidência repetida de baixo desempenho, procure uma variação ou outra oportunidade em vez de repetir mecanicamente.
 
 PESQUISA ATUAL:
 {fontes_texto}

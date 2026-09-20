@@ -450,6 +450,42 @@ def obter_ultimos_aprendizados(limite=10):
     return memoria["aprendizados"][-limite:]
 
 
+def obter_contexto_estrategico(limite_resultados=10, limite_testes=10, limite_aprendizados=10):
+    """Retorna evidências recentes para o Cérebro adaptar decisões futuras."""
+    memoria = carregar_memoria()
+
+    resultados = memoria["resultados"][-limite_resultados:]
+    testes = memoria["testes"][-limite_testes:]
+    aprendizados = memoria["aprendizados"][-limite_aprendizados:]
+
+    estrategias = {}
+    for item in resultados:
+        nome = item.get("estrategia") or "estratégia_sem_nome"
+        atual = estrategias.setdefault(nome, {
+            "quantidade_resultados": 0,
+            "receita_total": 0,
+            "custo_total": 0,
+            "resultado_total": 0,
+            "ultimos_resultados": []
+        })
+        atual["quantidade_resultados"] += 1
+        atual["receita_total"] += item.get("receita", 0) or 0
+        atual["custo_total"] += item.get("custo", 0) or 0
+        atual["resultado_total"] += item.get("resultado", 0) or 0
+        atual["ultimos_resultados"].append({
+            "data": item.get("data"),
+            "resultado": item.get("resultado", 0),
+            "acao": item.get("acao")
+        })
+        atual["ultimos_resultados"] = atual["ultimos_resultados"][-3:]
+
+    return {
+        "desempenho_por_estrategia": estrategias,
+        "testes_recentes": testes,
+        "aprendizados_recentes": aprendizados
+    }
+
+
 # =========================================================
 # RESUMO FINANCEIRO
 # =========================================================
