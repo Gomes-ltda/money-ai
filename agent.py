@@ -172,7 +172,9 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
             "acao_imediata": decisao_ia_detalhes.get(
                 "acao_imediata"
             ),
+            "localizacao": localizacao,
             "precisa_permissao": False,
+            "localizacao": localizacao,
             "motivo": motivo
         }
 

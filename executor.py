@@ -111,7 +111,10 @@ class Executor:
             or "Encontrar oportunidades de mercado"
         )
 
-        resultado = pesquisar(consulta)
+        resultado = pesquisar(
+            consulta,
+            decisao.get("localizacao", "Brasil")
+        )
 
         return {
             "status": "executado",
