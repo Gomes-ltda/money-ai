@@ -235,11 +235,17 @@ class Executor:
         contexto = {"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste"), "url_alvo": url_alvo}
         existentes = obter_acoes_externas(limite=100)
         for existente in reversed(existentes):
-            if (existente.get("status") in {"aguardando_autorizacao", "autorizada", "executando"}
-                    and existente.get("tipo") == "abordagem_comercial"
-                    and existente.get("estrategia") == decisao.get("estrategia")
-                    and existente.get("alvo") == cliente):
-                return {"status": "executado", "acao": "preparar_abordagem", "resultado": {"receita": 0, "custo": 0, "acao_externa_id": existente["id"], "status_acao_externa": existente["status"], "alvo": cliente, "canal": canal, "mensagem": existente.get("mensagem", mensagem), "duplicata": True}}
+            contexto_existente = existente.get("contexto") or {}
+            url_existente = (contexto_existente.get("url_alvo") or "").strip()
+            mesma_estrategia = existente.get("estrategia") == decisao.get("estrategia")
+            mesmo_alvo = existente.get("alvo") == cliente
+            mesma_url = bool(url_existente and url_existente == url_alvo)
+            status_existente = existente.get("status")
+            if (existente.get("tipo") == "abordagem_comercial"
+                    and mesma_estrategia
+                    and (mesmo_alvo or mesma_url)
+                    and status_existente in {"aguardando_autorizacao", "autorizada", "executando", "executada"}):
+                return {"status": "executado", "acao": "preparar_abordagem", "resultado": {"receita": 0, "custo": 0, "acao_externa_id": existente["id"], "status_acao_externa": status_existente, "alvo": cliente, "canal": canal, "mensagem": existente.get("mensagem", mensagem), "duplicata": True, "motivo": "Alvo ou URL já abordado nesta estratégia; nova abordagem bloqueada para evitar duplicidade."}}
         acao = registrar_acao_externa(
             tipo="abordagem_comercial", alvo=cliente, canal=canal, mensagem=mensagem,
             estrategia=decisao.get("estrategia"), contexto=contexto
