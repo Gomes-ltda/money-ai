@@ -7,7 +7,8 @@ from memory import (
     registrar_resultado,
     registrar_aprendizado,
     obter_ultimos_aprendizados,
-    obter_contexto_estrategico
+    obter_contexto_estrategico,
+    avaliar_estrategias
 )
 
 ACOES_PERMITIDAS = {
@@ -33,7 +34,10 @@ def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
         "acao_imediata": detalhes.get("acao_imediata"),
         "localizacao": localizacao,
         "precisa_permissao": False,
-        "motivo": motivo
+        "motivo": motivo,
+        "acao_sobre_estrategia": detalhes.get("acao_sobre_estrategia", "testar_nova"),
+        "estrategia_base": detalhes.get("estrategia_base"),
+        "justificativa_evidencia": detalhes.get("justificativa_evidencia")
     }
 
 
@@ -155,6 +159,22 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
     }
 
     estrategia = detalhes.get("estrategia")
+    acao_sobre_estrategia = detalhes.get("acao_sobre_estrategia", "testar_nova")
+    if acao_sobre_estrategia not in {"continuar", "modificar", "testar_nova", "aguardar"}:
+        acao_sobre_estrategia = "testar_nova"
+
+    avaliacao_atual = avaliar_estrategias()
+
+    if estrategia and acao_sobre_estrategia == "aguardar":
+        registrar_aprendizado(
+            aprendizado=f"A estratégia '{estrategia}' foi colocada em espera pela decisão estratégica.",
+            estrategia=estrategia,
+            evidencias=[avaliacao_atual.get(estrategia, {})],
+            impacto=0,
+            acao="aguardar",
+            recomendacao="aguardar"
+        )
+
     if estrategia:
         registrar_resultado(
             estrategia=estrategia, receita=receita, custo=custo,
