@@ -406,7 +406,8 @@ def criar_pagamento_pix():
         valor=valor,
         descricao=str(dados.get("descricao", "Serviço Evolia")).strip() or "Serviço Evolia",
         referencia=referencia,
-        email=email
+        email=email,
+        acao_id=acao_id
     )
     if resultado.get("status") == "criado":
         pagamento = resultado.get("pagamento") or {}
