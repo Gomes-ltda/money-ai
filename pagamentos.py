@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import os
 import uuid
+import re
 from datetime import datetime, timezone
 
 import requests
@@ -29,7 +30,15 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None):
     if valor <= 0:
         return {"status": "erro", "erro": "O valor deve ser maior que zero."}
 
+    email = (email or "").strip().lower()
+    if not re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", email):
+        return {"status": "erro", "erro": "Informe um e-mail válido do comprador para criar a cobrança Pix."}
+
     referencia = referencia or uuid.uuid4().hex
+    existente = next((x for x in obter_pagamentos() if x.get("referencia") == referencia), None)
+    if existente:
+        return {"status": "ja_existente", "pagamento": existente}
+
     payload = {
         "type": "online",
         "total_amount": f"{valor:.2f}",
@@ -41,7 +50,7 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None):
                 "payment_method": {"id": "pix", "type": "bank_transfer"}
             }]
         },
-        "payer": {"email": email or "comprador@evolia.invalid"}
+        "payer": {"email": email}
     }
 
     try:
@@ -50,7 +59,7 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None):
             headers={
                 "Authorization": f"Bearer {MP_ACCESS_TOKEN}",
                 "Content-Type": "application/json",
-                "X-Idempotency-Key": uuid.uuid4().hex
+                "X-Idempotency-Key": referencia
             },
             json=payload,
             timeout=30
@@ -68,6 +77,7 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None):
             "valor": valor,
             "descricao": descricao,
             "referencia": referencia,
+            "email_comprador": email,
             "criado_em": agora(),
             "ticket_url": None,
             "qr_code": None
