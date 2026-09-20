@@ -15,6 +15,24 @@ def analisar_oportunidade(
     contexto_memoria=None
 ):
 
+    # --------------------------------------------------
+    # 1. CARREGAR MEMÓRIA
+    # --------------------------------------------------
+
+    if contexto_memoria is None:
+
+        try:
+            contexto_memoria = (
+                obter_ultimos_aprendizados(10)
+            )
+
+        except Exception:
+            contexto_memoria = []
+
+    # --------------------------------------------------
+    # 2. PESQUISA
+    # --------------------------------------------------
+
     consultas = [
         objetivo,
         f"mercado e oportunidades {objetivo}",
@@ -30,16 +48,27 @@ def analisar_oportunidade(
     )
 
     if not fontes:
+
         return {
             "objetivo": objetivo,
             "localizacao": localizacao,
-            "erro": "Nenhuma informação encontrada.",
+            "erro": (
+                "Nenhuma informação encontrada."
+            ),
             "status": "erro"
         }
 
+    # --------------------------------------------------
+    # 3. PREPARAR PESQUISA
+    # --------------------------------------------------
+
     contexto = ""
 
-    for i, fonte in enumerate(fontes[:40], 1):
+    for i, fonte in enumerate(
+        fontes[:40],
+        1
+    ):
+
         contexto += (
             f"FONTE {i}\n"
             f"Título: {fonte.get('titulo')}\n"
@@ -48,12 +77,9 @@ def analisar_oportunidade(
             f"URL: {fonte.get('url')}\n\n"
         )
 
-    # Memória anterior
-    if contexto_memoria is None:
-        try:
-            contexto_memoria = obter_ultimos_aprendizados(10)
-        except Exception:
-            contexto_memoria = []
+    # --------------------------------------------------
+    # 4. PREPARAR MEMÓRIA
+    # --------------------------------------------------
 
     memoria_texto = ""
 
@@ -63,6 +89,7 @@ def analisar_oportunidade(
             contexto_memoria,
             1
         ):
+
             memoria_texto += (
                 f"APRENDIZADO {i}\n"
                 f"Estratégia: "
@@ -81,13 +108,16 @@ def analisar_oportunidade(
             "Nenhum aprendizado anterior disponível."
         )
 
+    # --------------------------------------------------
+    # 5. PROMPT DO CÉREBRO
+    # --------------------------------------------------
+
     prompt = f"""
 Você é o Cérebro da Money AI.
 
 Sua função é transformar pesquisa de mercado,
-histórico de testes e resultados em decisões
-operacionais para uma IA que precisa testar formas
-legítimas de gerar receita.
+memória de experiências anteriores e resultados
+em decisões operacionais.
 
 A Money AI começa com R$0 de capital.
 
@@ -97,86 +127,67 @@ OBJETIVO:
 LOCALIZAÇÃO:
 {localizacao}
 
-MEMÓRIA DOS CICLOS ANTERIORES:
+MEMÓRIA:
 {memoria_texto}
 
-PESQUISA REALIZADA AGORA:
+PESQUISA ATUAL:
 {contexto}
 
 REGRAS:
 
 1. Não invente fatos, clientes, preços ou resultados.
 
-2. Diferencie claramente evidência encontrada,
-hipótese e decisão da IA.
+2. Diferencie evidência, hipótese e decisão.
 
-3. Não considere uma oportunidade validada apenas
-porque parece interessante.
+3. Use a memória para melhorar decisões futuras.
 
-4. Procure oportunidades que possam ser testadas
-com R$0 inicialmente.
+4. Não repita automaticamente estratégias que
+apresentaram resultados ruins.
 
-5. Priorize ações que possam levar à primeira receita
-sem exigir investimento inicial.
+5. Se uma estratégia apresentou sinais positivos,
+considere aprofundá-la.
 
-6. Não prometa ganhos.
+6. R$0 de capital operacional.
 
-7. Não recomende golpes, spam, fraude, práticas
-enganosas ou atividades ilegais.
+7. Não recomende golpes, spam, fraude ou atividades ilegais.
 
-8. A Money AI deve agir como operadora de um negócio,
+8. Não prometa ganhos.
+
+9. A Money AI deve agir como operadora de um negócio,
 não apenas como consultora.
 
-9. Escolha UMA oportunidade principal para o próximo teste.
+10. Escolha UMA oportunidade principal.
 
-10. A oportunidade escolhida deve ser específica.
+11. A oportunidade deve ser específica.
 
-11. USE A MEMÓRIA.
+12. O objetivo é chegar à primeira receita real.
 
-12. Não repita automaticamente uma estratégia
-que já apresentou resultado ruim sem uma justificativa
-baseada em novas evidências.
+13. Priorize ações que possam ser realizadas sem
+investimento inicial.
 
-13. Se uma estratégia anterior apresentou sinais
-positivos, considere aprofundá-la.
+14. Ações externas envolvendo contas, mensagens,
+publicações ou dinheiro devem respeitar permissões.
 
-14. Se uma estratégia anterior não produziu receita,
-isso NÃO significa automaticamente que ela é inútil.
-Analise se o problema foi a estratégia, a oferta,
-o público, o canal ou simplesmente a falta de execução.
+15. Se a próxima etapa puder ser realizada internamente,
+ela pode ser executada sem pedir permissão.
 
-15. Diferencie:
-- estratégia testada
-- estratégia ainda não testada
-- estratégia que apresentou resultado positivo
-- estratégia que apresentou resultado negativo
-- estratégia que ainda precisa de evidência
+16. Não considere uma oportunidade validada apenas
+porque parece interessante.
 
-16. O aprendizado deve influenciar a próxima decisão.
+17. Use evidências da pesquisa.
 
-17. Se a pesquisa não possuir evidência suficiente,
-declare isso e indique qual pesquisa adicional deve
-ser feita antes de executar.
+18. Se faltar informação, indique exatamente o que
+precisa ser pesquisado.
 
-18. Nunca invente potenciais clientes.
+19. Pense em sequência:
+pesquisa → decisão → execução → medição → aprendizado.
 
-19. Toda ação externa que envolva publicação,
-mensagens, criação de contas ou dinheiro deve
-respeitar as permissões.
+20. O próximo passo deve aproximar a Money AI da
+primeira receita.
 
-20. Enquanto a Money AI estiver na fase R$0,
-o custo do teste deve permanecer em 0.
+RESPONDA SOMENTE COM JSON VÁLIDO.
 
-21. O objetivo atual não é apenas pesquisar.
-O objetivo é avançar progressivamente em direção
-à primeira receita real.
-
-22. Quando uma etapa preparatória estiver concluída,
-identifique qual deve ser a próxima ação concreta.
-
-RESPONDA EXATAMENTE EM JSON VÁLIDO.
-
-Use esta estrutura:
+ESTRUTURA:
 
 {{
     "objetivo": "...",
@@ -209,6 +220,7 @@ Use esta estrutura:
         "preco_teste": "...",
         "custo_teste": 0,
         "acao_imediata": "...",
+        "acao_executor": "pesquisar|analisar|criar_oferta|criar_proposta|criar_conteudo|testar_estrategia|aguardar",
         "precisa_permissao": false,
         "motivo_escolha": "..."
     }},
@@ -222,77 +234,144 @@ Use esta estrutura:
 
 IMPORTANTE:
 
-- "custo_teste" deve ser um número.
-- Enquanto a Money AI estiver na fase R$0,
-  "custo_teste" deve ser 0.
-- "precisa_permissao" deve ser true se a próxima
-  ação exigir publicação, envio de mensagens,
-  criação de conta ou movimentação/gasto de dinheiro.
-- "acao_imediata" deve ser uma ação concreta.
-- "aprendizado_utilizado" deve explicar quais
-  aprendizados anteriores influenciaram a decisão.
+- custo_teste deve ser número.
+- Na fase R$0, custo_teste deve ser 0.
+- acao_executor deve representar exatamente a ação
+que o Executor deverá realizar.
+- Se a ação for preparar uma oferta, use
+"criar_oferta".
+- Se for preparar uma proposta, use
+"criar_proposta".
+- Se for apenas pesquisar, use "pesquisar".
+- Se for produzir conteúdo, use "criar_conteudo".
 - Não coloque explicações fora do JSON.
 """
 
-    for tentativa in range(3):
+    # --------------------------------------------------
+    # 6. CHAMADA AO CÉREBRO
+    # --------------------------------------------------
+
+    try:
+
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt
+        )
+
+        texto = response.text.strip()
+
+        if texto.startswith("```"):
+
+            texto = texto.replace(
+                "```json",
+                ""
+            )
+
+            texto = texto.replace(
+                "```",
+                ""
+            )
+
+            texto = texto.strip()
 
         try:
 
-            response = client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=prompt
+            decisao = json.loads(
+                texto
             )
 
-            texto = response.text.strip()
-
-            if texto.startswith("```"):
-                texto = texto.replace(
-                    "```json",
-                    ""
-                )
-                texto = texto.replace(
-                    "```",
-                    ""
-                )
-                texto = texto.strip()
-
-            try:
-
-                decisao = json.loads(texto)
-
-            except json.JSONDecodeError:
-
-                return {
-                    "objetivo": objetivo,
-                    "localizacao": localizacao,
-                    "analise": response.text,
-                    "fontes": fontes,
-                    "erro": (
-                        "A IA respondeu, mas não "
-                        "retornou JSON válido."
-                    ),
-                    "status": "erro"
-                }
-
-            decisao["fontes_brutas"] = fontes
-            decisao["status"] = "sucesso"
-
-            return decisao
-
-        except Exception as erro:
-
-            erro_texto = str(erro)
-
-            if (
-                "503" in erro_texto
-                and tentativa < 2
-            ):
-                time.sleep(3)
-                continue
+        except json.JSONDecodeError:
 
             return {
                 "objetivo": objetivo,
                 "localizacao": localizacao,
-                "erro": erro_texto,
+                "analise": response.text,
+                "fontes": fontes,
+                "erro": (
+                    "A IA respondeu, mas não "
+                    "retornou JSON válido."
+                ),
                 "status": "erro"
             }
+
+        decisao["fontes_brutas"] = fontes
+        decisao["status"] = "sucesso"
+
+        return decisao
+
+    # --------------------------------------------------
+    # 7. TRATAMENTO DE ERROS
+    # --------------------------------------------------
+
+    except Exception as erro:
+
+        erro_texto = str(erro)
+
+        if "429" in erro_texto:
+
+            return {
+                "objetivo": objetivo,
+                "localizacao": localizacao,
+                "erro": (
+                    "Cota da Gemini excedida. "
+                    "Nenhuma nova tentativa foi "
+                    "realizada para evitar consumir "
+                    "mais requisições."
+                ),
+                "detalhes": erro_texto,
+                "status": "erro_cota"
+            }
+
+        if "503" in erro_texto:
+
+            time.sleep(3)
+
+            try:
+
+                response = client.models.generate_content(
+                    model="gemini-3.6-flash",
+                    contents=prompt
+                )
+
+                texto = response.text.strip()
+
+                if texto.startswith("```"):
+
+                    texto = texto.replace(
+                        "```json",
+                        ""
+                    )
+
+                    texto = texto.replace(
+                        "```",
+                        ""
+                    )
+
+                    texto = texto.strip()
+
+                decisao = json.loads(
+                    texto
+                )
+
+                decisao["fontes_brutas"] = fontes
+                decisao["status"] = "sucesso"
+
+                return decisao
+
+            except Exception as segundo_erro:
+
+                return {
+                    "objetivo": objetivo,
+                    "localizacao": localizacao,
+                    "erro": str(
+                        segundo_erro
+                    ),
+                    "status": "erro"
+                }
+
+        return {
+            "objetivo": objetivo,
+            "localizacao": localizacao,
+            "erro": erro_texto,
+            "status": "erro"
+        }
