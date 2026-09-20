@@ -373,8 +373,7 @@ def pagamento_detalhe(pagamento_id):
     if not verificar_token_aprovacao(token):
         return jsonify({"erro": "Não autorizado."}), 401
 
-    pagamentos = obter_pagamentos(limite=200)
-    pagamento = next((p for p in pagamentos if p.get("id") == pagamento_id), None)
+    pagamento = obter_pagamento_por_id(pagamento_id)
     if not pagamento:
         return jsonify({"erro": "Pagamento não encontrado."}), 404
 
