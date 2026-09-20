@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 
 from pesquisa import pesquisar_varias
-from memory import obter_ultimos_aprendizados, obter_contexto_estrategico, avaliar_estrategias
+from memory import obter_ultimos_aprendizados, obter_contexto_estrategico, avaliar_estrategias, obter_metricas_comerciais
 
 
 GEMINI_API_KEY = os.getenv(
@@ -115,6 +115,7 @@ def analisar_oportunidade(
 
     contexto_estrategico = obter_contexto_estrategico()
     avaliacao_estrategias = avaliar_estrategias()
+    metricas_comerciais = obter_metricas_comerciais()
 
     # =========================================================
     # 2. PESQUISA
@@ -178,7 +179,7 @@ DESEMPENHO E RESULTADOS DOS TESTES:
 AVALIAÇÃO OBJETIVA DAS ESTRATÉGIAS:
 {json.dumps(avaliacao_estrategias, ensure_ascii=False, indent=2)}
 
-Use o desempenho acima como evidência. Estratégias sem resultado financeiro positivo não devem ser tratadas como validadas. Resultados zero significam que ainda não houve receita real. Testes internos com receita zero não são, por si só, fracassos financeiros. Se uma estratégia tiver evidência repetida de baixo desempenho, procure uma variação ou outra oportunidade em vez de repetir mecanicamente.
+Use o desempenho acima como evidência. Estratégias sem resultado financeiro positivo não devem ser tratadas como validadas. Resultados zero significam que ainda não houve receita real. Abordagens preparadas ou enviadas, sem resposta ou venda confirmada, não devem ser tratadas como receita. Testes internos com receita zero não são, por si só, fracassos financeiros. Se uma estratégia tiver evidência repetida de baixo desempenho, procure uma variação ou outra oportunidade em vez de repetir mecanicamente.
 
 Ao decidir sobre uma estratégia, use:
 - continuar: quando houver evidência financeira positiva registrada;
@@ -402,7 +403,8 @@ FORMATO:
             "aprendizado_esperado": dados.get("aprendizado_esperado"),
             "proximo_passo": dados.get("proximo_passo"),
             "pesquisa_adicional_necessaria": dados.get("pesquisa_adicional_necessaria", False),
-            "fontes_utilizadas": dados.get("fontes_utilizadas", [])
+            "fontes_utilizadas": dados.get("fontes_utilizadas", []),
+            "metricas_comerciais_consideradas": metricas_comerciais
         }
 
     except Exception as erro:
