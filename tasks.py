@@ -10,6 +10,7 @@ ACOES_INTERNAS = {
     "criar_oferta",
     "criar_proposta",
     "criar_conteudo",
+    "preparar_abordagem",
     "testar_estrategia"
 }
 
