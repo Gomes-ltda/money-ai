@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template_string
+import os
 
 from ai import analisar_oportunidade
 from agent import executar_ciclo
@@ -6,6 +7,16 @@ from memory import obter_acoes_externas, atualizar_acao_externa
 
 
 app = Flask(__name__)
+APPROVAL_TOKEN = os.getenv("EVOLIA_APPROVAL_TOKEN", "").strip()
+
+
+def validar_token():
+    if not APPROVAL_TOKEN:
+        return False
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        return auth[7:].strip() == APPROVAL_TOKEN
+    return False
 
 
 HTML = """
@@ -66,6 +77,8 @@ HTML = """
     <h2>Ações externas pendentes</h2>
     <p>Estas ações foram preparadas pela Evolia e aguardam sua autorização.</p>
     <div id="statusAcao"></div>
+    <input id="tokenAutorizacao" type="password" placeholder="Token de autorização">
+    <button onclick="carregarAcoes()">Carregar ações</button>
     <div id="acoes"></div>
 
     <script>
@@ -103,10 +116,23 @@ HTML = """
                 resultado.textContent = "Erro: " + erro;
             }
         }
+        function obterToken() {
+            return document.getElementById("tokenAutorizacao").value.trim() || sessionStorage.getItem("evolia_token") || "";
+        }
         async function carregarAcoes() {
             const resultado = document.getElementById("acoes");
-            const resposta = await fetch("/acoes-pendentes");
+            const token = obterToken();
+            if (!token) {
+                resultado.innerHTML = "<p>Informe o token de autorização.</p>";
+                return;
+            }
+            sessionStorage.setItem("evolia_token", token);
+            const resposta = await fetch("/acoes-pendentes", {headers: {"Authorization": "Bearer " + token}});
             const dados = await resposta.json();
+            if (!resposta.ok) {
+                resultado.innerHTML = "<p>" + (dados.erro || "Token inválido.") + "</p>";
+                return;
+            }
             if (!dados.acoes || dados.acoes.length === 0) {
                 resultado.innerHTML = "<p>Nenhuma ação aguardando autorização.</p>";
                 return;
@@ -121,12 +147,12 @@ HTML = """
             ).join("");
         }
         async function decidirAcao(id, decisao) {
-            const resposta = await fetch("/acoes/" + encodeURIComponent(id) + "/" + decisao, {method:"POST"});
+            const token = obterToken();
+            const resposta = await fetch("/acoes/" + encodeURIComponent(id) + "/" + decisao, {method:"POST", headers: {"Authorization": "Bearer " + token}});
             const dados = await resposta.json();
             document.getElementById("statusAcao").textContent = dados.mensagem || JSON.stringify(dados);
             carregarAcoes();
         }
-        carregarAcoes();
     </script>
 </body>
 </html>
@@ -148,11 +174,15 @@ def health():
 
 @app.route("/acoes-pendentes")
 def acoes_pendentes():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     return jsonify({"acoes": obter_acoes_externas(status="aguardando_autorizacao", limite=20)})
 
 
 @app.route("/acoes/<acao_id>/<decisao>", methods=["POST"])
 def decidir_acao(acao_id, decisao):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     if decisao not in {"autorizar", "recusar"}:
         return jsonify({"erro": "Decisão inválida."}), 400
     acao = next((x for x in obter_acoes_externas(limite=100) if x.get("id") == acao_id), None)
