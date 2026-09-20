@@ -67,18 +67,21 @@ class Executor:
         return {"status": "executado", "acao": "pesquisar", "consulta": consulta, "resultado": resultado}
 
     def executar_analise(self, decisao):
+        anterior = decisao.get("resultado_anterior") or {}
         analise = {
             "estrategia": decisao.get("estrategia"),
             "nicho": decisao.get("nicho"),
             "cliente_alvo": decisao.get("cliente_alvo"),
             "problema": decisao.get("problema"),
             "oferta": decisao.get("oferta"),
-            "canal": decisao.get("canal")
+            "canal": decisao.get("canal"),
+            "base_anterior": anterior.get("resultado", anterior)
         }
         registrar_evento("analise", f"Análise estruturada para a estratégia: {decisao.get('estrategia')}")
         return {"status": "executado", "acao": "analisar", "resultado": {"receita": 0, "custo": 0, "analise": analise}}
 
     def criar_oferta(self, decisao):
+        anterior = decisao.get("resultado_anterior") or {}
         oferta = {
             "estrategia": decisao.get("estrategia"),
             "nicho": decisao.get("nicho"),
@@ -87,15 +90,18 @@ class Executor:
             "oferta": decisao.get("oferta"),
             "canal": decisao.get("canal"),
             "preco_teste": decisao.get("preco_teste"),
-            "custo_teste": decisao.get("custo_teste", 0)
+            "custo_teste": decisao.get("custo_teste", 0),
+            "base_anterior": anterior.get("resultado", anterior)
         }
         registrar_evento("oferta_criada", f"Oferta estruturada: {decisao.get('oferta')}")
         return {"status": "executado", "acao": "criar_oferta", "resultado": {"receita": 0, "custo": 0, "oferta": oferta}}
 
     def criar_proposta(self, decisao):
+        anterior = decisao.get("resultado_anterior") or {}
         cliente = decisao.get("cliente_alvo", "cliente potencial")
         oferta = decisao.get("oferta", "serviço")
         problema = decisao.get("problema", "uma necessidade do cliente")
+        base_anterior = anterior.get("resultado", anterior)
         preco = decisao.get("preco_teste")
         proposta = f"Olá! Identifiquei que {cliente} pode estar enfrentando {problema}. Posso oferecer {oferta} "
         if preco is not None:
@@ -104,7 +110,7 @@ class Executor:
         registrar_evento("proposta_criada", f"Proposta preparada para: {cliente}")
         return {
             "status": "executado", "acao": "criar_proposta",
-            "resultado": {"receita": 0, "custo": 0, "proposta": proposta, "cliente_alvo": cliente, "preco_teste": preco}
+            "resultado": {"receita": 0, "custo": 0, "proposta": proposta, "cliente_alvo": cliente, "preco_teste": preco, "base_anterior": base_anterior}
         }
 
     def criar_conteudo(self, decisao):
@@ -120,6 +126,7 @@ class Executor:
 
     def testar_estrategia(self, decisao):
         estrategia = decisao.get("estrategia", "estratégia sem nome")
+        anterior = decisao.get("resultado_anterior") or {}
         plano = {
             "objetivo": decisao.get("objetivo"),
             "nicho": decisao.get("nicho"),
@@ -128,7 +135,8 @@ class Executor:
             "canal": decisao.get("canal"),
             "preco_teste": decisao.get("preco_teste"),
             "custo_teste": decisao.get("custo_teste", 0),
-            "acao_imediata": decisao.get("acao_imediata")
+            "acao_imediata": decisao.get("acao_imediata"),
+            "contexto_anterior": anterior.get("resultado", anterior)
         }
         restricoes = {
             "receita_real": False,
