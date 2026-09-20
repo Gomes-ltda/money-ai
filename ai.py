@@ -3,12 +3,17 @@ import time
 
 from google import genai
 from pesquisa import pesquisar_varias
+from memory import obter_ultimos_aprendizados
 
 
 client = genai.Client()
 
 
-def analisar_oportunidade(objetivo, localizacao):
+def analisar_oportunidade(
+    objetivo,
+    localizacao,
+    contexto_memoria=None
+):
 
     consultas = [
         objetivo,
@@ -43,12 +48,46 @@ def analisar_oportunidade(objetivo, localizacao):
             f"URL: {fonte.get('url')}\n\n"
         )
 
+    # Memória anterior
+    if contexto_memoria is None:
+        try:
+            contexto_memoria = obter_ultimos_aprendizados(10)
+        except Exception:
+            contexto_memoria = []
+
+    memoria_texto = ""
+
+    if contexto_memoria:
+
+        for i, aprendizado in enumerate(
+            contexto_memoria,
+            1
+        ):
+            memoria_texto += (
+                f"APRENDIZADO {i}\n"
+                f"Estratégia: "
+                f"{aprendizado.get('estrategia')}\n"
+                f"Aprendizado: "
+                f"{aprendizado.get('aprendizado')}\n"
+                f"Evidências: "
+                f"{aprendizado.get('evidencias')}\n"
+                f"Impacto: "
+                f"{aprendizado.get('impacto')}\n\n"
+            )
+
+    else:
+
+        memoria_texto = (
+            "Nenhum aprendizado anterior disponível."
+        )
+
     prompt = f"""
 Você é o Cérebro da Money AI.
 
-Sua função é transformar pesquisa de mercado em decisões
-operacionais para uma IA que precisa testar formas legítimas
-de gerar receita.
+Sua função é transformar pesquisa de mercado,
+histórico de testes e resultados em decisões
+operacionais para uma IA que precisa testar formas
+legítimas de gerar receita.
 
 A Money AI começa com R$0 de capital.
 
@@ -58,7 +97,10 @@ OBJETIVO:
 LOCALIZAÇÃO:
 {localizacao}
 
-PESQUISA REALIZADA:
+MEMÓRIA DOS CICLOS ANTERIORES:
+{memoria_texto}
+
+PESQUISA REALIZADA AGORA:
 {contexto}
 
 REGRAS:
@@ -89,14 +131,48 @@ não apenas como consultora.
 
 10. A oportunidade escolhida deve ser específica.
 
-11. Se a pesquisa não possuir evidência suficiente,
+11. USE A MEMÓRIA.
+
+12. Não repita automaticamente uma estratégia
+que já apresentou resultado ruim sem uma justificativa
+baseada em novas evidências.
+
+13. Se uma estratégia anterior apresentou sinais
+positivos, considere aprofundá-la.
+
+14. Se uma estratégia anterior não produziu receita,
+isso NÃO significa automaticamente que ela é inútil.
+Analise se o problema foi a estratégia, a oferta,
+o público, o canal ou simplesmente a falta de execução.
+
+15. Diferencie:
+- estratégia testada
+- estratégia ainda não testada
+- estratégia que apresentou resultado positivo
+- estratégia que apresentou resultado negativo
+- estratégia que ainda precisa de evidência
+
+16. O aprendizado deve influenciar a próxima decisão.
+
+17. Se a pesquisa não possuir evidência suficiente,
 declare isso e indique qual pesquisa adicional deve
 ser feita antes de executar.
 
-12. Nunca invente potenciais clientes.
+18. Nunca invente potenciais clientes.
 
-13. Toda ação externa que envolva publicação, mensagens,
-criação de contas ou dinheiro deve respeitar as permissões.
+19. Toda ação externa que envolva publicação,
+mensagens, criação de contas ou dinheiro deve
+respeitar as permissões.
+
+20. Enquanto a Money AI estiver na fase R$0,
+o custo do teste deve permanecer em 0.
+
+21. O objetivo atual não é apenas pesquisar.
+O objetivo é avançar progressivamente em direção
+à primeira receita real.
+
+22. Quando uma etapa preparatória estiver concluída,
+identifique qual deve ser a próxima ação concreta.
 
 RESPONDA EXATAMENTE EM JSON VÁLIDO.
 
@@ -104,6 +180,11 @@ Use esta estrutura:
 
 {{
     "objetivo": "...",
+
+    "aprendizado_utilizado": [
+        "..."
+    ],
+
     "oportunidades": [
         {{
             "nome": "...",
@@ -117,6 +198,7 @@ Use esta estrutura:
             "nivel_confianca": "baixo|medio|alto"
         }}
     ],
+
     "decisao": {{
         "estrategia": "...",
         "nicho": "...",
@@ -130,8 +212,11 @@ Use esta estrutura:
         "precisa_permissao": false,
         "motivo_escolha": "..."
     }},
+
     "proximo_passo": "...",
+
     "pesquisa_adicional_necessaria": [],
+
     "fontes_utilizadas": []
 }}
 
@@ -144,6 +229,8 @@ IMPORTANTE:
   ação exigir publicação, envio de mensagens,
   criação de conta ou movimentação/gasto de dinheiro.
 - "acao_imediata" deve ser uma ação concreta.
+- "aprendizado_utilizado" deve explicar quais
+  aprendizados anteriores influenciaram a decisão.
 - Não coloque explicações fora do JSON.
 """
 
@@ -159,11 +246,18 @@ IMPORTANTE:
             texto = response.text.strip()
 
             if texto.startswith("```"):
-                texto = texto.replace("```json", "")
-                texto = texto.replace("```", "")
+                texto = texto.replace(
+                    "```json",
+                    ""
+                )
+                texto = texto.replace(
+                    "```",
+                    ""
+                )
                 texto = texto.strip()
 
             try:
+
                 decisao = json.loads(texto)
 
             except json.JSONDecodeError:
@@ -173,7 +267,10 @@ IMPORTANTE:
                     "localizacao": localizacao,
                     "analise": response.text,
                     "fontes": fontes,
-                    "erro": "A IA respondeu, mas não retornou JSON válido.",
+                    "erro": (
+                        "A IA respondeu, mas não "
+                        "retornou JSON válido."
+                    ),
                     "status": "erro"
                 }
 
@@ -186,7 +283,10 @@ IMPORTANTE:
 
             erro_texto = str(erro)
 
-            if "503" in erro_texto and tentativa < 2:
+            if (
+                "503" in erro_texto
+                and tentativa < 2
+            ):
                 time.sleep(3)
                 continue
 
