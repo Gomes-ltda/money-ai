@@ -137,6 +137,11 @@ class Executor:
             proposta_anterior = anterior.get("resultado", {}).get("proposta")
         cliente = decisao.get("cliente_alvo", "cliente potencial")
         canal = decisao.get("canal", "canal não definido")
+        url_alvo = (decisao.get("url_alvo") or "").strip()
+        if canal not in {"instagram", "linkedin", "whatsapp", "email"}:
+            return {"status": "bloqueado", "acao": "preparar_abordagem", "motivo": "Canal externo não suportado ou não definido."}
+        if not url_alvo.startswith(("https://", "http://")):
+            return {"status": "bloqueado", "acao": "preparar_abordagem", "motivo": "URL pública específica do alvo não foi definida."}
         mensagem = proposta_anterior or decisao.get("proposta") or (
             f"Olá! Vi seu trabalho e identifiquei uma oportunidade relacionada a {decisao.get('problema', 'uma necessidade do seu negócio')}. "
             f"Tenho uma proposta de teste pequeno para {decisao.get('oferta', 'uma solução específica')}. "
