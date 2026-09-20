@@ -175,7 +175,17 @@ MEMÓRIA DE APRENDIZADOS ANTERIORES:
 DESEMPENHO E RESULTADOS DOS TESTES:
 {json.dumps(contexto_estrategico, ensure_ascii=False, indent=2)}
 
-Use o desempenho acima como evidência. Estratégias sem resultado financeiro positivo não devem ser tratadas como validadas. Resultados zero significam que ainda não houve receita real. Se uma estratégia tiver evidência repetida de baixo desempenho, procure uma variação ou outra oportunidade em vez de repetir mecanicamente.
+AVALIAÇÃO OBJETIVA DAS ESTRATÉGIAS:
+{json.dumps(avaliacao_estrategias, ensure_ascii=False, indent=2)}
+
+Use o desempenho acima como evidência. Estratégias sem resultado financeiro positivo não devem ser tratadas como validadas. Resultados zero significam que ainda não houve receita real. Testes internos com receita zero não são, por si só, fracassos financeiros. Se uma estratégia tiver evidência repetida de baixo desempenho, procure uma variação ou outra oportunidade em vez de repetir mecanicamente.
+
+Ao decidir sobre uma estratégia, use:
+- continuar: quando houver evidência financeira positiva registrada;
+- modificar: quando houver sinais negativos repetidos ou resultado total negativo;
+- testar_nova: quando não houver evidência suficiente ou quando for uma estratégia nova;
+- aguardar: quando nenhuma ação adicional for justificada.
+Nunca trate uma estratégia como validada apenas porque foi criada, pesquisada ou planejada.
 
 PESQUISA ATUAL:
 {fontes_texto}
