@@ -283,6 +283,24 @@ def atualizar_acao_externa(acao_id, status, resultado=None):
     return None
 
 
+def registrar_feedback_acao_externa(acao_id, resposta=None, interesse=None, venda=False, receita=0, custo=0, observacao=None):
+    memoria = carregar_memoria()
+    for acao in reversed(memoria["acoes_externas"]):
+        if acao.get("id") == acao_id:
+            feedback = {"data": agora(), "resposta": resposta, "interesse": interesse, "venda": bool(venda), "receita": float(receita or 0), "custo": float(custo or 0), "observacao": observacao}
+            acao.setdefault("feedback", []).append(feedback)
+            if venda:
+                memoria["financeiro"]["receita"] += float(receita or 0)
+                memoria["financeiro"]["custos"] += float(custo or 0)
+            salvar_memoria(memoria)
+            if venda:
+                registrar_aprendizado("Ação externa gerou uma venda confirmada pelo usuário.", estrategia=acao.get("estrategia"), evidencias=[{"acao_externa_id": acao_id, "feedback": feedback}], impacto="venda_confirmada", acao="repetir_e_testar_variacoes", confianca="alta", recomendacao="avaliar estratégia com base na receita confirmada")
+            elif interesse:
+                registrar_aprendizado("Ação externa recebeu indicação de interesse registrada pelo usuário.", estrategia=acao.get("estrategia"), evidencias=[{"acao_externa_id": acao_id, "feedback": feedback}], impacto="interesse_confirmado", acao="acompanhar_conversao", confianca="media", recomendacao="aguardar confirmação de venda antes de contabilizar receita")
+            return feedback
+    return None
+
+
 def obter_acoes_externas(status=None, limite=20):
     memoria = carregar_memoria()
     acoes = memoria["acoes_externas"]
