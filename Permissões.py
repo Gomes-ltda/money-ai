@@ -7,6 +7,7 @@ ARQUIVO_PERMISSOES = "permissions.json"
 
 PERMISSOES_PADRAO = {
     # Ações internas autônomas
+    "aguardar": True,
     "pesquisar": True,
     "analisar": True,
     "criar_oferta": True,

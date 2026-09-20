@@ -3,6 +3,7 @@ import os
 import time
 
 from google import genai
+from google.genai import types
 
 from pesquisa import pesquisar_varias
 from memory import obter_ultimos_aprendizados
@@ -12,7 +13,7 @@ GEMINI_API_KEY = os.getenv(
     "GEMINI_API_KEY"
 )
 
-MODELO = "gemini-3.6-flash"
+MODELO = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 
 def analisar_oportunidade(
@@ -79,9 +80,9 @@ def analisar_oportunidade(
     # =========================================================
 
     prompt = f"""
-Você é o Cérebro da Money AI.
+Você é o Cérebro da Evolia AI.
 
-A Money AI é um agente criado para encontrar,
+A Evolia AI é um agente criado para encontrar,
 testar e desenvolver formas legítimas de gerar
 receita online.
 
@@ -119,12 +120,12 @@ Você deve:
 
 REGRA IMPORTANTE:
 
-A Money AI possui R$0 de capital inicial.
+A Evolia AI possui R$0 de capital inicial.
 
 Portanto, priorize estratégias que possam começar
 sem investimento financeiro.
 
-A Money AI não deve:
+A Evolia AI não deve:
 
 - movimentar dinheiro sem autorização;
 - criar contas sem autorização;
@@ -232,7 +233,10 @@ FORMATO:
 
         resposta = cliente.models.generate_content(
             model=MODELO,
-            contents=prompt
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
         )
 
         texto = resposta.text.strip()
@@ -318,7 +322,10 @@ FORMATO:
 
                 resposta = cliente.models.generate_content(
                     model=MODELO,
-                    contents=prompt
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json"
+                    )
                 )
 
                 texto = resposta.text.strip()
