@@ -3,11 +3,11 @@ import uuid
 
 from Permissões import solicitar_permissao
 from pesquisa import pesquisar
-from memory import registrar_evento, registrar_teste
+from memory import registrar_evento, registrar_teste, registrar_acao_externa
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "testar_estrategia"
+    "criar_proposta", "criar_conteudo", "preparar_abordagem", "testar_estrategia"
 }
 
 def agora():
@@ -40,6 +40,8 @@ class Executor:
                 resultado = self.criar_proposta(decisao)
             elif acao == "criar_conteudo":
                 resultado = self.criar_conteudo(decisao)
+            elif acao == "preparar_abordagem":
+                resultado = self.preparar_abordagem(decisao)
             elif acao == "testar_estrategia":
                 resultado = self.testar_estrategia(decisao)
             else:
@@ -128,6 +130,25 @@ class Executor:
         registrar_evento("conteudo_criado", f"Conteúdo preparado para o canal: {decisao.get('canal')}")
         return {"status": "executado", "acao": "criar_conteudo", "resultado": {"receita": 0, "custo": 0, "conteudo": conteudo}}
 
+    def preparar_abordagem(self, decisao):
+        anterior = decisao.get("resultado_anterior") or {}
+        proposta_anterior = None
+        if isinstance(anterior, dict):
+            proposta_anterior = anterior.get("resultado", {}).get("proposta")
+        cliente = decisao.get("cliente_alvo", "cliente potencial")
+        canal = decisao.get("canal", "canal não definido")
+        mensagem = proposta_anterior or decisao.get("proposta") or (
+            f"Olá! Vi seu trabalho e identifiquei uma oportunidade relacionada a {decisao.get('problema', 'uma necessidade do seu negócio')}. "
+            f"Tenho uma proposta de teste pequeno para {decisao.get('oferta', 'uma solução específica')}. "
+            "Posso te explicar em poucas linhas?"
+        )
+        acao = registrar_acao_externa(
+            tipo="abordagem_comercial", alvo=cliente, canal=canal, mensagem=mensagem,
+            estrategia=decisao.get("estrategia"),
+            contexto={"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste")}
+        )
+        registrar_evento("abordagem_preparada", f"Abordagem preparada para {cliente} no canal {canal}; aguardando autorização.")
+        return {"status": "executado", "acao": "preparar_abordagem", "resultado": {"receita": 0, "custo": 0, "acao_externa_id": acao["id"], "status_acao_externa": acao["status"], "alvo": cliente, "canal": canal, "mensagem": mensagem}}
     def testar_estrategia(self, decisao):
         anterior = decisao.get("resultado_anterior") or {}
         proposta_anterior = anterior.get("resultado", {}).get("proposta") if isinstance(anterior, dict) else None
