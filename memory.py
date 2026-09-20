@@ -7,7 +7,6 @@ ARQUIVO_MEMORIA = "memory.json"
 
 
 def memoria_padrao():
-
     return {
         "eventos": [],
         "estrategias": [],
@@ -23,20 +22,19 @@ def memoria_padrao():
 
 
 def garantir_estrutura(memoria):
-
     padrao = memoria_padrao()
 
     if not isinstance(memoria, dict):
         memoria = padrao
 
     for chave, valor in padrao.items():
-
         if chave not in memoria:
-
             memoria[chave] = valor
 
-    if not isinstance(memoria.get("financeiro"), dict):
-
+    if not isinstance(
+        memoria.get("financeiro"),
+        dict
+    ):
         memoria["financeiro"] = {
             "receita": 0,
             "custos": 0
@@ -56,7 +54,6 @@ def garantir_estrutura(memoria):
 
 
 def agora():
-
     return datetime.now(
         timezone.utc
     ).isoformat()
@@ -64,12 +61,11 @@ def agora():
 
 def carregar_memoria():
 
-    if not os.path.exists(ARQUIVO_MEMORIA):
-
+    if not os.path.exists(
+        ARQUIVO_MEMORIA
+    ):
         memoria = memoria_padrao()
-
         salvar_memoria(memoria)
-
         return memoria
 
     try:
@@ -80,11 +76,13 @@ def carregar_memoria():
             encoding="utf-8"
         ) as arquivo:
 
-            memoria = json.load(arquivo)
+            memoria = json.load(
+                arquivo
+            )
 
-        memoria = garantir_estrutura(memoria)
-
-        salvar_memoria(memoria)
+        memoria = garantir_estrutura(
+            memoria
+        )
 
         return memoria
 
@@ -95,7 +93,9 @@ def carregar_memoria():
 
 def salvar_memoria(memoria):
 
-    memoria = garantir_estrutura(memoria)
+    memoria = garantir_estrutura(
+        memoria
+    )
 
     with open(
         ARQUIVO_MEMORIA,
@@ -111,7 +111,14 @@ def salvar_memoria(memoria):
         )
 
 
-def registrar_evento(tipo, descricao):
+# =========================================================
+# EVENTOS
+# =========================================================
+
+def registrar_evento(
+    tipo,
+    descricao
+):
 
     memoria = carregar_memoria()
 
@@ -121,39 +128,63 @@ def registrar_evento(tipo, descricao):
         "descricao": descricao
     }
 
-    memoria["eventos"].append(evento)
+    memoria["eventos"].append(
+        evento
+    )
 
     salvar_memoria(memoria)
 
+    return evento
+
+
+# =========================================================
+# RESULTADOS FINANCEIROS
+# =========================================================
 
 def registrar_resultado(
     estrategia,
     receita=0,
     custo=0,
-    resultado=None
+    resultado=None,
+    acao=None,
+    evidencias=None
 ):
 
     memoria = carregar_memoria()
 
     if resultado is None:
-
         resultado = receita - custo
 
     registro = {
         "data": agora(),
         "estrategia": estrategia,
+        "acao": acao,
         "receita": receita,
         "custo": custo,
-        "resultado": resultado
+        "resultado": resultado,
+        "evidencias": evidencias or []
     }
 
-    memoria["resultados"].append(registro)
+    memoria["resultados"].append(
+        registro
+    )
 
-    memoria["financeiro"]["receita"] += receita
-    memoria["financeiro"]["custos"] += custo
+    memoria["financeiro"]["receita"] += (
+        receita
+    )
+
+    memoria["financeiro"]["custos"] += (
+        custo
+    )
 
     salvar_memoria(memoria)
 
+    return registro
+
+
+# =========================================================
+# ESTRATÉGIAS
+# =========================================================
 
 def registrar_estrategia(
     nome,
@@ -176,6 +207,12 @@ def registrar_estrategia(
 
     salvar_memoria(memoria)
 
+    return estrategia
+
+
+# =========================================================
+# CICLOS
+# =========================================================
 
 def registrar_ciclo(
     objetivo,
@@ -200,12 +237,18 @@ def registrar_ciclo(
         "medicao": medicao
     }
 
-    memoria["ciclos"].append(ciclo)
+    memoria["ciclos"].append(
+        ciclo
+    )
 
     salvar_memoria(memoria)
 
     return ciclo
 
+
+# =========================================================
+# TESTES
+# =========================================================
 
 def registrar_teste(
     estrategia,
@@ -222,7 +265,6 @@ def registrar_teste(
     memoria = carregar_memoria()
 
     if resultado is None:
-
         resultado = receita - custo
 
     teste = {
@@ -240,18 +282,27 @@ def registrar_teste(
         "status": status
     }
 
-    memoria["testes"].append(teste)
+    memoria["testes"].append(
+        teste
+    )
 
     salvar_memoria(memoria)
 
     return teste
 
 
+# =========================================================
+# APRENDIZADO
+# =========================================================
+
 def registrar_aprendizado(
     aprendizado,
     estrategia=None,
     evidencias=None,
-    impacto=None
+    impacto=None,
+    acao=None,
+    confianca=None,
+    recomendacao=None
 ):
 
     memoria = carregar_memoria()
@@ -260,8 +311,11 @@ def registrar_aprendizado(
         "data": agora(),
         "aprendizado": aprendizado,
         "estrategia": estrategia,
+        "acao": acao,
         "evidencias": evidencias or [],
-        "impacto": impacto
+        "impacto": impacto,
+        "confianca": confianca,
+        "recomendacao": recomendacao
     }
 
     memoria["aprendizados"].append(
@@ -273,47 +327,39 @@ def registrar_aprendizado(
     return registro
 
 
+# =========================================================
+# HISTÓRICO DE UMA ESTRATÉGIA
+# =========================================================
+
 def obter_historico_estrategia(
     estrategia
 ):
 
     memoria = carregar_memoria()
 
-    resultados = []
-
-    for registro in memoria["resultados"]:
-
+    resultados = [
+        registro
+        for registro in memoria["resultados"]
         if registro.get(
             "estrategia"
-        ) == estrategia:
+        ) == estrategia
+    ]
 
-            resultados.append(
-                registro
-            )
-
-    testes = []
-
-    for teste in memoria["testes"]:
-
+    testes = [
+        teste
+        for teste in memoria["testes"]
         if teste.get(
             "estrategia"
-        ) == estrategia:
+        ) == estrategia
+    ]
 
-            testes.append(
-                teste
-            )
-
-    aprendizados = []
-
-    for aprendizado in memoria["aprendizados"]:
-
+    aprendizados = [
+        aprendizado
+        for aprendizado in memoria["aprendizados"]
         if aprendizado.get(
             "estrategia"
-        ) == estrategia:
-
-            aprendizados.append(
-                aprendizado
-            )
+        ) == estrategia
+    ]
 
     return {
         "estrategia": estrategia,
@@ -322,6 +368,10 @@ def obter_historico_estrategia(
         "aprendizados": aprendizados
     }
 
+
+# =========================================================
+# ÚLTIMOS APRENDIZADOS
+# =========================================================
 
 def obter_ultimos_aprendizados(
     limite=10
@@ -335,6 +385,10 @@ def obter_ultimos_aprendizados(
 
     return aprendizados[-limite:]
 
+
+# =========================================================
+# RESUMO FINANCEIRO
+# =========================================================
 
 def obter_resumo():
 
