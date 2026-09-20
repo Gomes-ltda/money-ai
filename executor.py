@@ -3,7 +3,7 @@ import uuid
 
 from Permissões import solicitar_permissao
 from pesquisa import pesquisar
-from memory import registrar_evento, registrar_teste, registrar_acao_externa
+from memory import registrar_evento, registrar_teste, registrar_acao_externa, obter_acoes_externas
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
@@ -142,10 +142,17 @@ class Executor:
             f"Tenho uma proposta de teste pequeno para {decisao.get('oferta', 'uma solução específica')}. "
             "Posso te explicar em poucas linhas?"
         )
+        contexto = {"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste"), "url_alvo": decisao.get("url_alvo")}
+        existentes = obter_acoes_externas(limite=100)
+        for existente in reversed(existentes):
+            if (existente.get("status") in {"aguardando_autorizacao", "autorizada", "executando"}
+                    and existente.get("tipo") == "abordagem_comercial"
+                    and existente.get("estrategia") == decisao.get("estrategia")
+                    and existente.get("alvo") == cliente):
+                return {"status": "executado", "acao": "preparar_abordagem", "resultado": {"receita": 0, "custo": 0, "acao_externa_id": existente["id"], "status_acao_externa": existente["status"], "alvo": cliente, "canal": canal, "mensagem": existente.get("mensagem", mensagem), "duplicata": True}}
         acao = registrar_acao_externa(
             tipo="abordagem_comercial", alvo=cliente, canal=canal, mensagem=mensagem,
-            estrategia=decisao.get("estrategia"),
-            contexto={"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste"), "url_alvo": decisao.get("url_alvo")}
+            estrategia=decisao.get("estrategia"), contexto=contexto
         )
         registrar_evento("abordagem_preparada", f"Abordagem preparada para {cliente} no canal {canal}; aguardando autorização.")
         return {"status": "executado", "acao": "preparar_abordagem", "resultado": {"receita": 0, "custo": 0, "acao_externa_id": acao["id"], "status_acao_externa": acao["status"], "alvo": cliente, "canal": canal, "mensagem": mensagem}}
