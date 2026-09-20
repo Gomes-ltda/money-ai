@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import requests
 
 from google import genai
 from google.genai import types
@@ -12,6 +13,9 @@ from memory import obter_ultimos_aprendizados
 GEMINI_API_KEY = os.getenv(
     "GEMINI_API_KEY"
 )
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
 
 MODELOS = [modelo.strip() for modelo in os.getenv("GEMINI_MODELS", "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash-lite").split(",") if modelo.strip()]
 
@@ -38,6 +42,33 @@ def _gerar_json(cliente, prompt):
                 continue
             return None, modelo, mensagem
     return None, None, ultimo_erro
+
+def _gerar_openai(prompt):
+    if not OPENAI_API_KEY:
+        return None, None, None
+    try:
+        resposta = requests.post(
+            "https://api.openai.com/v1/responses",
+            headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+            json={"model": OPENAI_MODEL, "input": prompt},
+            timeout=90
+        )
+        resposta.raise_for_status()
+        bruto = resposta.json()
+        texto = bruto.get("output_text", "")
+        if not texto:
+            partes = []
+            for item in bruto.get("output", []):
+                for conteudo in item.get("content", []):
+                    if conteudo.get("type") in {"output_text", "text"}:
+                        partes.append(conteudo.get("text", ""))
+            texto = "".join(partes)
+        texto = texto.strip()
+        if texto.startswith("```"):
+            texto = texto.replace("```json", "").replace("```", "").strip()
+        return json.loads(texto), OPENAI_MODEL, None
+    except Exception as erro:
+        return None, OPENAI_MODEL, str(erro)
 
 def analisar_oportunidade(
     objetivo,
@@ -253,10 +284,22 @@ FORMATO:
         dados, modelo_usado, erro = _gerar_json(cliente, prompt)
 
         if dados is None:
-            mensagem = erro or "Nenhum modelo Gemini conseguiu responder."
-            if ("429" in mensagem or "RESOURCE_EXHAUSTED" in mensagem or "quota" in mensagem.lower()):
-                return {"status": "erro_cota", "erro": "Os modelos Gemini configurados estão sem capacidade ou cota disponível no momento.", "detalhes": erro, "modelos_tentados": MODELOS, "objetivo": objetivo, "localizacao": localizacao}
-            return {"status": "erro", "erro": mensagem, "modelos_tentados": MODELOS, "objetivo": objetivo, "localizacao": localizacao}
+            dados_openai, modelo_openai, erro_openai = _gerar_openai(prompt)
+            if dados_openai is not None:
+                dados = dados_openai
+                modelo_usado = modelo_openai
+            else:
+                mensagem = erro_openai or erro or "Nenhum provedor de IA conseguiu responder."
+                return {
+                    "status": "erro_cota" if ("429" in mensagem or "RESOURCE_EXHAUSTED" in mensagem or "quota" in mensagem.lower()) else "erro",
+                    "erro": mensagem,
+                    "detalhes": erro,
+                    "erro_openai": erro_openai,
+                    "modelos_tentados": MODELOS,
+                    "openai_configurado": bool(OPENAI_API_KEY),
+                    "objetivo": objetivo,
+                    "localizacao": localizacao
+                }
 
         return {
             "status": "sucesso",
