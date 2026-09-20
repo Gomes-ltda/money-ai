@@ -169,14 +169,16 @@ def consultar_acao_externa(acao_id):
             resultado = dados.get("result") or {}
             enviado = bool(resultado.get("enviado")) if isinstance(resultado, dict) else False
             novo_status = "executada" if enviado else "falhou"
+            ja_finalizada = acao.get("status") in {"executada", "falhou", "cancelada"}
             atualizar_acao_externa(acao_id, novo_status, {
                 "run_id": run_id,
                 "status_tinyfish": status,
                 "resultado_tinyfish": resultado,
                 "consultado_em": agora()
             })
-            registrar_evento("acao_externa_finalizada", f"Ação externa {acao_id} terminou com status {novo_status}.")
-            if novo_status == "executada":
+            if not ja_finalizada:
+                registrar_evento("acao_externa_finalizada", f"Ação externa {acao_id} terminou com status {novo_status}.")
+            if novo_status == "executada" and not ja_finalizada:
                 estrategia = acao.get("estrategia")
                 registrar_aprendizado(
                     "A abordagem externa foi enviada com sucesso; conversão e receita ainda não foram confirmadas.",
