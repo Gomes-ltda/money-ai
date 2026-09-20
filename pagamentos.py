@@ -1,0 +1,151 @@
+import hashlib
+import hmac
+import os
+import uuid
+from datetime import datetime, timezone
+
+import requests
+
+from memory import registrar_pagamento, atualizar_pagamento, obter_pagamentos, registrar_resultado
+
+
+MP_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN", "").strip()
+MP_WEBHOOK_SECRET = os.getenv("MERCADOPAGO_WEBHOOK_SECRET", "").strip()
+MP_API = "https://api.mercadopago.com"
+
+
+def agora():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def criar_cobranca_pix(valor, descricao, referencia=None, email=None):
+    if not MP_ACCESS_TOKEN:
+        return {
+            "status": "aguardando_configuracao",
+            "erro": "MERCADOPAGO_ACCESS_TOKEN não configurado."
+        }
+
+    valor = float(valor)
+    if valor <= 0:
+        return {"status": "erro", "erro": "O valor deve ser maior que zero."}
+
+    referencia = referencia or uuid.uuid4().hex
+    payload = {
+        "type": "online",
+        "total_amount": f"{valor:.2f}",
+        "external_reference": referencia,
+        "processing_mode": "automatic",
+        "transactions": {
+            "payments": [{
+                "amount": f"{valor:.2f}",
+                "payment_method": {"id": "pix", "type": "bank_transfer"}
+            }]
+        },
+        "payer": {"email": email or "comprador@evolia.invalid"}
+    }
+
+    try:
+        resposta = requests.post(
+            f"{MP_API}/v1/orders",
+            headers={
+                "Authorization": f"Bearer {MP_ACCESS_TOKEN}",
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": uuid.uuid4().hex
+            },
+            json=payload,
+            timeout=30
+        )
+        dados = resposta.json()
+        if not resposta.ok:
+            return {"status": "erro", "codigo": resposta.status_code, "detalhes": dados}
+
+        order_id = str(dados.get("id"))
+        payment = {
+            "id": order_id,
+            "provedor": "mercado_pago",
+            "tipo": "pix",
+            "status": "aguardando_pagamento",
+            "valor": valor,
+            "descricao": descricao,
+            "referencia": referencia,
+            "criado_em": agora(),
+            "ticket_url": None,
+            "qr_code": None
+        }
+
+        transactions = (dados.get("transactions") or {}).get("payments") or []
+        if transactions:
+            method = transactions[0].get("payment_method") or {}
+            payment["ticket_url"] = method.get("ticket_url")
+            payment["qr_code"] = method.get("qr_code")
+
+        registrar_pagamento(payment)
+        return {"status": "criado", "pagamento": payment}
+    except Exception as erro:
+        return {"status": "erro", "erro": str(erro)}
+
+
+def validar_webhook(headers, data_id):
+    if not MP_WEBHOOK_SECRET:
+        return False
+
+    signature = headers.get("x-signature", "")
+    request_id = headers.get("x-request-id", "")
+    if not signature:
+        return False
+
+    partes = {}
+    for parte in signature.split(","):
+        chave, separador, valor = parte.partition("=")
+        if separador:
+            partes[chave.strip()] = valor.strip()
+
+    ts = partes.get("ts")
+    recebido = partes.get("v1")
+    if not ts or not recebido:
+        return False
+
+    manifest = f"id:{str(data_id or '').lower()};request-id:{request_id};ts:{ts};"
+    esperado = hmac.new(
+        MP_WEBHOOK_SECRET.encode(),
+        manifest.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    return hmac.compare_digest(esperado, recebido)
+
+
+def processar_webhook(payload, data_id):
+    if not data_id:
+        return {"status": "ignorado", "motivo": "data.id ausente"}
+
+    pagamento_id = str(data_id)
+    existente = next((x for x in obter_pagamentos() if str(x.get("id")) == pagamento_id), None)
+
+    if not existente:
+        return {"status": "ignorado", "motivo": "pagamento não registrado pela Evolia", "id": pagamento_id}
+
+    action = payload.get("action", "")
+    tipo = payload.get("type", "")
+    atualizado = atualizar_pagamento(
+        pagamento_id,
+        ultimo_evento=action,
+        tipo_evento=tipo,
+        webhook_recebido_em=agora()
+    )
+
+    if action in {"order.processed", "payment.updated"}:
+        atualizar_pagamento(pagamento_id, status="pago")
+
+        if not existente.get("receita_registrada"):
+            registrar_resultado(
+                estrategia=existente.get("estrategia") or "venda via pagamento",
+                receita=float(existente.get("valor", 0) or 0),
+                custo=0,
+                resultado=float(existente.get("valor", 0) or 0),
+                acao="pagamento_confirmado",
+                evidencias=[{"pagamento_id": pagamento_id, "evento": payload}]
+            )
+            atualizar_pagamento(pagamento_id, receita_registrada=True)
+
+    return {"status": "processado", "pagamento": atualizado or existente}
