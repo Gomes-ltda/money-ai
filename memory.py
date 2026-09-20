@@ -450,8 +450,69 @@ def obter_ultimos_aprendizados(limite=10):
     return memoria["aprendizados"][-limite:]
 
 
+def avaliar_estrategias(limite_resultados=50):
+    """Calcula estados objetivos das estratégias com base em resultados registrados."""
+    memoria = carregar_memoria()
+    resultados = memoria["resultados"][-limite_resultados:]
+
+    agrupadas = {}
+    for item in resultados:
+        nome = item.get("estrategia") or "estratégia_sem_nome"
+        grupo = agrupadas.setdefault(nome, [])
+        grupo.append(item)
+
+    avaliadas = {}
+    for nome, itens in agrupadas.items():
+        receitas = [float(x.get("receita", 0) or 0) for x in itens]
+        custos = [float(x.get("custo", 0) or 0) for x in itens]
+        resultados_financeiros = [float(x.get("resultado", 0) or 0) for x in itens]
+        positivos = sum(1 for x in resultados_financeiros if x > 0)
+        negativos = sum(1 for x in resultados_financeiros if x < 0)
+        zeros = sum(1 for x in resultados_financeiros if x == 0)
+
+        consecutivos_sem_resultado = 0
+        for valor in reversed(resultados_financeiros):
+            if valor <= 0:
+                consecutivos_sem_resultado += 1
+            else:
+                break
+
+        total_receita = sum(receitas)
+        total_custo = sum(custos)
+        total_resultado = sum(resultados_financeiros)
+
+        if positivos > 0 and total_resultado > 0:
+            estado = "sinal_positivo"
+            recomendacao = "continuar"
+        elif len(itens) >= 3 and consecutivos_sem_resultado >= 3:
+            estado = "sinal_negativo"
+            recomendacao = "modificar"
+        elif len(itens) >= 2 and negativos > 0 and total_resultado < 0:
+            estado = "sinal_negativo"
+            recomendacao = "modificar"
+        else:
+            estado = "em_teste"
+            recomendacao = "testar_mais"
+
+        avaliadas[nome] = {
+            "tentativas": len(itens),
+            "receita_total": total_receita,
+            "custo_total": total_custo,
+            "resultado_total": total_resultado,
+            "resultados_positivos": positivos,
+            "resultados_negativos": negativos,
+            "resultados_zero": zeros,
+            "tentativas_consecutivas_sem_resultado_positivo": consecutivos_sem_resultado,
+            "ultimo_resultado": resultados_financeiros[-1],
+            "estado": estado,
+            "recomendacao": recomendacao
+        }
+
+    return avaliadas
+
+
 def obter_contexto_estrategico(limite_resultados=10, limite_testes=10, limite_aprendizados=10):
-    """Retorna evidências recentes para o Cérebro adaptar decisões futuras."""
+    """Retorna evidências recentes e avaliação objetiva das estratégias."""
     memoria = carregar_memoria()
 
     resultados = memoria["resultados"][-limite_resultados:]
@@ -481,10 +542,10 @@ def obter_contexto_estrategico(limite_resultados=10, limite_testes=10, limite_ap
 
     return {
         "desempenho_por_estrategia": estrategias,
+        "avaliacao_de_estrategias": avaliar_estrategias(),
         "testes_recentes": testes,
         "aprendizados_recentes": aprendizados
     }
-
 
 # =========================================================
 # RESUMO FINANCEIRO

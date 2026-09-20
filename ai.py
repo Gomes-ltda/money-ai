@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 
 from pesquisa import pesquisar_varias
-from memory import obter_ultimos_aprendizados, obter_contexto_estrategico
+from memory import obter_ultimos_aprendizados, obter_contexto_estrategico, avaliar_estrategias
 
 
 GEMINI_API_KEY = os.getenv(
@@ -114,6 +114,7 @@ def analisar_oportunidade(
         contexto_memoria = obter_ultimos_aprendizados(10)
 
     contexto_estrategico = obter_contexto_estrategico()
+    avaliacao_estrategias = avaliar_estrategias()
 
     # =========================================================
     # 2. PESQUISA
@@ -174,7 +175,17 @@ MEMÓRIA DE APRENDIZADOS ANTERIORES:
 DESEMPENHO E RESULTADOS DOS TESTES:
 {json.dumps(contexto_estrategico, ensure_ascii=False, indent=2)}
 
-Use o desempenho acima como evidência. Estratégias sem resultado financeiro positivo não devem ser tratadas como validadas. Resultados zero significam que ainda não houve receita real. Se uma estratégia tiver evidência repetida de baixo desempenho, procure uma variação ou outra oportunidade em vez de repetir mecanicamente.
+AVALIAÇÃO OBJETIVA DAS ESTRATÉGIAS:
+{json.dumps(avaliacao_estrategias, ensure_ascii=False, indent=2)}
+
+Use o desempenho acima como evidência. Estratégias sem resultado financeiro positivo não devem ser tratadas como validadas. Resultados zero significam que ainda não houve receita real. Testes internos com receita zero não são, por si só, fracassos financeiros. Se uma estratégia tiver evidência repetida de baixo desempenho, procure uma variação ou outra oportunidade em vez de repetir mecanicamente.
+
+Ao decidir sobre uma estratégia, use:
+- continuar: quando houver evidência financeira positiva registrada;
+- modificar: quando houver sinais negativos repetidos ou resultado total negativo;
+- testar_nova: quando não houver evidência suficiente ou quando for uma estratégia nova;
+- aguardar: quando nenhuma ação adicional for justificada.
+Nunca trate uma estratégia como validada apenas porque foi criada, pesquisada ou planejada.
 
 PESQUISA ATUAL:
 {fontes_texto}
