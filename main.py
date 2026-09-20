@@ -3,7 +3,7 @@ import os
 
 from ai import analisar_oportunidade
 from agent import executar_ciclo
-from memory import obter_acoes_externas, atualizar_acao_externa
+from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa
 from external import iniciar_acao_autorizada, consultar_acao_externa
 
 
@@ -259,6 +259,26 @@ def decidir_acao(acao_id, decisao):
 
     atualizar_acao_externa(acao_id, "cancelada", {"origem": "interface_usuario"})
     return jsonify({"status": "cancelada", "mensagem": "Ação recusada e cancelada."})
+
+
+@app.route("/acoes/<acao_id>/feedback", methods=["POST"])
+def feedback_acao(acao_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    dados = request.get_json(silent=True) or {}
+    interesse = dados.get("interesse")
+    venda = bool(dados.get("venda", False))
+    try:
+        receita = float(dados.get("receita", 0) or 0)
+        custo = float(dados.get("custo", 0) or 0)
+    except (TypeError, ValueError):
+        return jsonify({"erro": "Receita e custo devem ser números."}), 400
+    if receita < 0 or custo < 0:
+        return jsonify({"erro": "Receita e custo não podem ser negativos."}), 400
+    feedback = registrar_feedback_acao_externa(acao_id, resposta=str(dados.get("resposta", "")).strip() or None, interesse=str(interesse).strip() if interesse is not None else None, venda=venda, receita=receita, custo=custo, observacao=str(dados.get("observacao", "")).strip() or None)
+    if feedback is None:
+        return jsonify({"erro": "Ação externa não encontrada."}), 404
+    return jsonify({"status": "registrado", "feedback": feedback})
 
 
 @app.route("/acoes/<acao_id>/status")
