@@ -154,6 +154,18 @@ HTML = """
             document.getElementById("statusAcao").textContent = dados.mensagem || JSON.stringify(dados);
             carregarAcoes();
         }
+        let intervaloAcoes = null;
+        function iniciarAtualizacaoAutomatica() {
+            if (intervaloAcoes) clearInterval(intervaloAcoes);
+            if (obterToken()) {
+                carregarAcoes();
+                intervaloAcoes = setInterval(() => {
+                    if (obterToken()) carregarAcoes();
+                }, 10000);
+            }
+        }
+        window.addEventListener("load", iniciarAtualizacaoAutomatica);
+        document.getElementById("tokenAutorizacao").addEventListener("change", iniciarAtualizacaoAutomatica);
     </script>
 </body>
 </html>
