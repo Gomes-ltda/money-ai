@@ -5,7 +5,7 @@ from ai import analisar_oportunidade
 from agent import executar_ciclo
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
-from pagamentos import criar_cobranca_pix, validar_webhook, processar_webhook
+from pagamentos import criar_cobranca_pix, validar_webhook, processar_webhook, sincronizar_pagamento
 from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca
 
 
@@ -365,6 +365,19 @@ def status_acao(acao_id):
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     return jsonify(consultar_acao_externa(acao_id))
+
+
+@app.route("/pagamentos/<pagamento_id>/sincronizar", methods=["POST"])
+def pagamento_sincronizar(pagamento_id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    if not verificar_token_aprovacao(token):
+        return jsonify({"erro": "Não autorizado."}), 401
+    resultado = sincronizar_pagamento(pagamento_id)
+    if resultado.get("status") == "nao_encontrado":
+        return jsonify(resultado), 404
+    if resultado.get("status") == "indisponivel":
+        return jsonify(resultado), 503
+    return jsonify(resultado)
 
 
 @app.route("/pagamentos/<pagamento_id>", methods=["GET"])
