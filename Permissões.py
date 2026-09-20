@@ -13,6 +13,7 @@ PERMISSOES_PADRAO = {
     "criar_oferta": True,
     "criar_proposta": True,
     "criar_conteudo": True,
+    "preparar_abordagem": True,
     "testar_estrategia": True,
     "registrar_resultado": True,
     "criar_tarefa": True,

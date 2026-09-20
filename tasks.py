@@ -41,7 +41,7 @@ def criar_tarefas(decisao):
         adicionar("testar_estrategia", "Estruturar o teste da estratégia após preparar a proposta.")
     elif acao == "criar_conteudo":
         adicionar("criar_conteudo", "Produzir o material de teste.")
-    elif acao == "testar_estrategia":
+    elif acao == "preparar_abordagem":\n        adicionar("preparar_abordagem", "Preparar uma abordagem comercial sem enviá-la.")\n    elif acao == "testar_estrategia":
         adicionar("testar_estrategia", "Registrar e estruturar o teste da estratégia.")
     else:
         adicionar("aguardar", "Aguardar uma próxima decisão segura.")

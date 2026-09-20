@@ -235,6 +235,7 @@ AÇÕES DISPONÍVEIS AO EXECUTOR:
 - criar_oferta
 - criar_proposta
 - criar_conteudo
+- preparar_abordagem
 - testar_estrategia
 
 ESCOLHA EXATAMENTE UMA.
@@ -260,6 +261,9 @@ Se for hora de produzir material:
 
 Se já existir uma estratégia pronta para teste:
 "testar_estrategia"
+
+Se a estratégia já tiver oferta, cliente-alvo, canal e proposta suficientes para uma primeira abordagem, mas ainda não tiver sido preparada uma ação externa:
+"preparar_abordagem"
 
 Se nenhuma ação segura fizer sentido:
 "aguardar"
@@ -300,6 +304,9 @@ FORMATO:
         "acao_imediata": "...",
         "acao_executor": "...",
         "precisa_permissao": false,
+        "acao_sobre_estrategia": "continuar|modificar|testar_nova|aguardar",
+        "estrategia_base": "...",
+        "justificativa_evidencia": "...",
         "motivo_escolha": "..."
     }},
 
