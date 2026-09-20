@@ -6,7 +6,7 @@ from agent import executar_ciclo
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
 from pagamentos import criar_cobranca_pix, validar_webhook, processar_webhook, sincronizar_pagamento
-from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca
+from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca, obter_pagamento_por_id
 
 
 app = Flask(__name__)
