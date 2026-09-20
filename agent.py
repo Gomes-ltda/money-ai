@@ -16,7 +16,7 @@ ACOES_PERMITIDAS = {
     "criar_proposta", "criar_conteudo", "preparar_abordagem", "testar_estrategia"
 }
 
-MAX_TAREFAS_POR_CICLO = 3
+MAX_TAREFAS_POR_CICLO = 5
 
 
 def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
@@ -29,6 +29,7 @@ def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
         "problema": detalhes.get("problema"),
         "oferta": detalhes.get("oferta"),
         "canal": detalhes.get("canal"),
+        "url_alvo": detalhes.get("url_alvo"),
         "preco_teste": detalhes.get("preco_teste"),
         "custo_teste": detalhes.get("custo_teste"),
         "acao_imediata": detalhes.get("acao_imediata"),
