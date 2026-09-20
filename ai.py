@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 
 from pesquisa import pesquisar_varias
-from memory import obter_ultimos_aprendizados, obter_contexto_estrategico
+from memory import obter_ultimos_aprendizados, obter_contexto_estrategico, avaliar_estrategias
 
 
 GEMINI_API_KEY = os.getenv(
@@ -114,6 +114,7 @@ def analisar_oportunidade(
         contexto_memoria = obter_ultimos_aprendizados(10)
 
     contexto_estrategico = obter_contexto_estrategico()
+    avaliacao_estrategias = avaliar_estrategias()
 
     # =========================================================
     # 2. PESQUISA
