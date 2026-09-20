@@ -135,42 +135,71 @@ class Executor:
     def pesquisar_alvo(self, decisao):
         cliente = decisao.get("cliente_alvo") or "pequenos negócios"
         nicho = decisao.get("nicho") or ""
-        consulta = f'"{cliente}" {nicho} perfil Instagram negócio Brasil site:instagram.com OR site:linkedin.com'
-        pesquisa = pesquisar(consulta, decisao.get("localizacao", "Brasil"))
-        resultados = pesquisa.get("resultados", []) if isinstance(pesquisa, dict) else []
+        localizacao = decisao.get("localizacao", "Brasil")
+
+        consultas = [
+            f'"{cliente}" {nicho} perfil Instagram Brasil site:instagram.com',
+            f'"{cliente}" {nicho} LinkedIn Brasil site:linkedin.com/in/',
+            f'"{cliente}" {nicho} WhatsApp Brasil site:wa.me',
+            f'"{cliente}" {nicho} contato WhatsApp Brasil',
+        ]
+
+        resultados = []
+        consultas_executadas = []
+        for consulta in consultas:
+            pesquisa = pesquisar(consulta, localizacao)
+            consultas_executadas.append(consulta)
+            if isinstance(pesquisa, dict):
+                resultados.extend(pesquisa.get("resultados", []))
+
         candidatos = []
-        for item in resultados:
+        vistos = set()
+
+        def adicionar_candidato(item, canal):
             url = (item.get("url") or "").strip()
-            if any(host in url for host in (
-                "instagram.com/", "linkedin.com/in/", "facebook.com/", "business.site/", "google.com/maps/", "workana.com/", "99freelas.com/", "freelancer.com/"
-            )):
-                candidatos.append({
-                    "url": url,
-                    "titulo": item.get("titulo"),
-                    "site": item.get("site"),
-                    "resumo": item.get("resumo")
-                })
+            if not url or url in vistos:
+                return
+            vistos.add(url)
+            candidatos.append({
+                "url": url,
+                "titulo": item.get("titulo"),
+                "site": item.get("site"),
+                "resumo": item.get("resumo"),
+                "canal": canal
+            })
+
+        for item in resultados:
+            url = (item.get("url") or "").strip().lower()
+            if "instagram.com/" in url and "/explore" not in url and "/accounts/" not in url and "/about" not in url:
+                adicionar_candidato(item, "instagram")
+            elif "linkedin.com/in/" in url:
+                adicionar_candidato(item, "linkedin")
+            elif "wa.me/" in url or "api.whatsapp.com/send" in url:
+                adicionar_candidato(item, "whatsapp")
+
         if not candidatos:
             return {
                 "status": "bloqueado",
                 "acao": "pesquisar_alvo",
-                "motivo": "Nenhum alvo público específico foi encontrado em Instagram ou LinkedIn.",
-                "consulta": consulta,
+                "motivo": "Nenhum alvo público específico e contatável foi encontrado nas pesquisas realizadas.",
+                "consultas": consultas_executadas,
                 "resultado": {"receita": 0, "custo": 0, "candidatos": []}
             }
+
         alvo = candidatos[0]
-        canal = "linkedin" if "linkedin.com/in/" in alvo["url"] else "instagram"
+        canal = alvo["canal"]
         registrar_evento("alvo_pesquisado", f"Alvo público encontrado: {alvo['url']} via {canal}.")
         return {
             "status": "executado",
             "acao": "pesquisar_alvo",
-            "consulta": consulta,
+            "consultas": consultas_executadas,
             "resultado": {
                 "receita": 0,
                 "custo": 0,
                 "url_alvo": alvo["url"],
                 "canal": canal,
-                "alvo_encontrado": alvo
+                "alvo_encontrado": alvo,
+                "candidatos": candidatos[:5]
             }
         }
 
