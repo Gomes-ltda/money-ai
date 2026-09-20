@@ -76,10 +76,10 @@ def analisar_oportunidade(
     contexto_memoria=None
 ):
 
-    if not GEMINI_API_KEY:
+    if not GEMINI_API_KEY and not OPENAI_API_KEY:
         return {
             "status": "erro_configuracao",
-            "erro": "GEMINI_API_KEY não configurada.",
+            "erro": "Nenhum provedor de IA configurado. Configure GEMINI_API_KEY ou OPENAI_API_KEY.",
             "objetivo": objetivo,
             "localizacao": localizacao
         }
@@ -280,8 +280,13 @@ FORMATO:
     # =========================================================
 
     try:
-        cliente = genai.Client(api_key=GEMINI_API_KEY)
-        dados, modelo_usado, erro = _gerar_json(cliente, prompt)
+        dados = None
+        modelo_usado = None
+        erro = None
+
+        if GEMINI_API_KEY:
+            cliente = genai.Client(api_key=GEMINI_API_KEY)
+            dados, modelo_usado, erro = _gerar_json(cliente, prompt)
 
         if dados is None:
             dados_openai, modelo_openai, erro_openai = _gerar_openai(prompt)
