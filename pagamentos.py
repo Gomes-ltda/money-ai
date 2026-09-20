@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import requests
 
-from memory import registrar_pagamento, atualizar_pagamento, obter_pagamentos, registrar_resultado
+from memory import registrar_pagamento, atualizar_pagamento, obter_pagamentos
 
 
 MP_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN", "").strip()
@@ -19,7 +19,7 @@ def agora():
     return datetime.now(timezone.utc).isoformat()
 
 
-def criar_cobranca_pix(valor, descricao, referencia=None, email=None):
+def criar_cobranca_pix(valor, descricao, referencia=None, email=None, acao_id=None):
     if not MP_ACCESS_TOKEN:
         return {
             "status": "aguardando_configuracao",
@@ -80,6 +80,7 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None):
             "descricao": descricao,
             "referencia": referencia,
             "email_comprador": email,
+            "acao_id": acao_id,
             "criado_em": agora(),
             "ticket_url": None,
             "qr_code": None
@@ -192,15 +193,13 @@ def processar_webhook(payload, data_id):
                 existente
             )
             if not atual.get("receita_registrada"):
-                registrar_resultado(
-                    estrategia=atual.get("estrategia") or "venda via pagamento",
-                    receita=float(atual.get("valor", 0) or 0),
-                    custo=0,
-                    resultado=float(atual.get("valor", 0) or 0),
-                    acao="pagamento_confirmado",
-                    evidencias=[{"pagamento_id": pagamento_id, "evento": payload, "order": order}]
+                # A venda já é contabilizada quando o feedback de venda é confirmado.
+                # O pagamento apenas liquida essa venda; não registra receita novamente.
+                atualizar_pagamento(
+                    pagamento_id,
+                    receita_registrada=True,
+                    receita_reconhecida_em=agora()
                 )
-                atualizar_pagamento(pagamento_id, receita_registrada=True)
         elif falhou:
             atualizar_pagamento(
                 pagamento_id,
