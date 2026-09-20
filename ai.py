@@ -13,16 +13,20 @@ GEMINI_API_KEY = os.getenv(
     "GEMINI_API_KEY"
 )
 
-MODELO = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+MODELOS = [modelo.strip() for modelo in os.getenv("GEMINI_MODELS", "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash-lite").split(",") if modelo.strip()]
 
 
-def analisar_oportunidade(
-    objetivo,
-    localizacao="Brasil",
-    contexto_memoria=None
-):
+def _gerar_json(cliente, prompt):
+    ultimo_erro = None
+    for modelo in MODELOS:
+        try:
+            dados, modelo_usado, erro = _gerar_json(cliente, prompt)
 
-    if not GEMINI_API_KEY:
+        if dados is None:
+            mensagem = erro or "Nenhum modelo Gemini conseguiu responder."
+            if ("429" in mensagem or "RESOURCE_EXHAUSTED" in mensagem or "quota" in mensagem.lower()):
+                return {"status": "erro_cota", "erro": "Os modelos Gemini configurados estão sem capacidade ou cota disponível no momento.", "detalhes": erro, "modelos_tentados": MODELOS, "objetivo": objetivo, "localizacao": localizacao}
+            return {"status": "erro", "erro": mensagem, "modelos_tentados": MODELOS, "objetivo": objetivo, "localizacao": localizacao}
         return {
             "status": "erro_configuracao",
             "erro": "GEMINI_API_KEY não configurada.",
@@ -103,7 +107,7 @@ Sua função NÃO é simplesmente listar ideias.
 Você deve:
 
 1. analisar as oportunidades encontradas;
-2. considerar o que a Money AI já aprendeu;
+2. considerar o que a Evolia AI já aprendeu;
 3. evitar repetir estratégias que apresentaram
    resultados ruins sem uma justificativa;
 4. preservar e aprofundar estratégias que
@@ -309,41 +313,7 @@ FORMATO:
                 "localizacao": localizacao
             }
 
-        # Uma única tentativa adicional apenas
-        # para erros temporários de servidor.
-        if (
-            "503" in mensagem
-            or "UNAVAILABLE" in mensagem
-        ):
-
-            try:
-
-                time.sleep(2)
-
-                resposta = cliente.models.generate_content(
-                    model=MODELO,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json"
-                    )
-                )
-
-                texto = resposta.text.strip()
-
-                if texto.startswith("```"):
-                    texto = texto.replace(
-                        "```json",
-                        ""
-                    ).replace(
-                        "```",
-                        ""
-                    ).strip()
-
-                dados = json.loads(
-                    texto
-                )
-
-                return {
+        return {
                     "status": "sucesso",
                     "objetivo": objetivo,
                     "localizacao": localizacao,
