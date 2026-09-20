@@ -32,10 +32,13 @@ def criar_tarefas(decisao):
         adicionar("analisar", "Estruturar os dados encontrados.")
     elif acao == "analisar":
         adicionar("analisar", "Estruturar a oportunidade e seus dados.")
+        adicionar("criar_oferta", "Montar a oferta inicial a partir da análise.")
     elif acao == "criar_oferta":
         adicionar("criar_oferta", "Montar a oferta inicial.")
+        adicionar("criar_proposta", "Preparar a proposta comercial a partir da oferta.")
     elif acao == "criar_proposta":
         adicionar("criar_proposta", "Preparar a proposta comercial.")
+        adicionar("testar_estrategia", "Estruturar o teste da estratégia após preparar a proposta.")
     elif acao == "criar_conteudo":
         adicionar("criar_conteudo", "Produzir o material de teste.")
     elif acao == "testar_estrategia":
