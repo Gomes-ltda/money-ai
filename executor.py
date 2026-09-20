@@ -225,7 +225,7 @@ class Executor:
             f"Tenho uma proposta de teste pequeno para {decisao.get('oferta', 'uma solução específica')}. "
             "Posso te explicar em poucas linhas?"
         )
-        contexto = {"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste"), "url_alvo": decisao.get("url_alvo")}
+        contexto = {"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste"), "url_alvo": url_alvo}
         existentes = obter_acoes_externas(limite=100)
         for existente in reversed(existentes):
             if (existente.get("status") in {"aguardando_autorizacao", "autorizada", "executando"}
