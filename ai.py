@@ -13,8 +13,31 @@ GEMINI_API_KEY = os.getenv(
     "GEMINI_API_KEY"
 )
 
-MODELO = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+MODELOS = [modelo.strip() for modelo in os.getenv("GEMINI_MODELS", "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash-lite").split(",") if modelo.strip()]
 
+
+def _gerar_json(cliente, prompt):
+    ultimo_erro = None
+    for modelo in MODELOS:
+        try:
+            resposta = cliente.models.generate_content(
+                model=modelo,
+                contents=prompt,
+                config=types.GenerateContentConfig(response_mime_type="application/json")
+            )
+            texto = resposta.text.strip()
+            if texto.startswith("```"):
+                texto = texto.replace("```json", "").replace("```", "").strip()
+            return json.loads(texto), modelo, None
+        except Exception as erro:
+            mensagem = str(erro)
+            ultimo_erro = mensagem
+            if ("429" in mensagem or "RESOURCE_EXHAUSTED" in mensagem or
+                    "503" in mensagem or "UNAVAILABLE" in mensagem or
+                    "high demand" in mensagem.lower()):
+                continue
+            return None, modelo, mensagem
+    return None, None, ultimo_erro
 
 def analisar_oportunidade(
     objetivo,
@@ -103,7 +126,7 @@ Sua função NÃO é simplesmente listar ideias.
 Você deve:
 
 1. analisar as oportunidades encontradas;
-2. considerar o que a Money AI já aprendeu;
+2. considerar o que a Evolia AI já aprendeu;
 3. evitar repetir estratégias que apresentaram
    resultados ruins sem uma justificativa;
 4. preservar e aprofundar estratégias que
@@ -226,169 +249,33 @@ FORMATO:
     # =========================================================
 
     try:
+        cliente = genai.Client(api_key=GEMINI_API_KEY)
+        dados, modelo_usado, erro = _gerar_json(cliente, prompt)
 
-        cliente = genai.Client(
-            api_key=GEMINI_API_KEY
-        )
-
-        resposta = cliente.models.generate_content(
-            model=MODELO,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
-        )
-
-        texto = resposta.text.strip()
-
-        # Remove possíveis blocos Markdown
-        if texto.startswith("```"):
-            texto = texto.replace(
-                "```json",
-                ""
-            ).replace(
-                "```",
-                ""
-            ).strip()
-
-        dados = json.loads(
-            texto
-        )
+        if dados is None:
+            mensagem = erro or "Nenhum modelo Gemini conseguiu responder."
+            if ("429" in mensagem or "RESOURCE_EXHAUSTED" in mensagem or "quota" in mensagem.lower()):
+                return {"status": "erro_cota", "erro": "Os modelos Gemini configurados estão sem capacidade ou cota disponível no momento.", "detalhes": erro, "modelos_tentados": MODELOS, "objetivo": objetivo, "localizacao": localizacao}
+            return {"status": "erro", "erro": mensagem, "modelos_tentados": MODELOS, "objetivo": objetivo, "localizacao": localizacao}
 
         return {
             "status": "sucesso",
             "objetivo": objetivo,
             "localizacao": localizacao,
-            "decisao": dados.get(
-                "decisao",
-                {}
-            ),
-            "oportunidades": dados.get(
-                "oportunidades",
-                []
-            ),
-            "aprendizado_utilizado": dados.get(
-                "aprendizado_utilizado",
-                []
-            ),
-            "aprendizado_esperado": dados.get(
-                "aprendizado_esperado"
-            ),
-            "proximo_passo": dados.get(
-                "proximo_passo"
-            ),
-            "pesquisa_adicional_necessaria": dados.get(
-                "pesquisa_adicional_necessaria",
-                False
-            ),
-            "fontes_utilizadas": dados.get(
-                "fontes_utilizadas",
-                []
-            )
+            "modelo_utilizado": modelo_usado,
+            "decisao": dados.get("decisao", {}),
+            "oportunidades": dados.get("oportunidades", []),
+            "aprendizado_utilizado": dados.get("aprendizado_utilizado", []),
+            "aprendizado_esperado": dados.get("aprendizado_esperado"),
+            "proximo_passo": dados.get("proximo_passo"),
+            "pesquisa_adicional_necessaria": dados.get("pesquisa_adicional_necessaria", False),
+            "fontes_utilizadas": dados.get("fontes_utilizadas", [])
         }
 
     except Exception as erro:
-
-        mensagem = str(erro)
-
-        if (
-            "429" in mensagem
-            or "RESOURCE_EXHAUSTED" in mensagem
-            or "quota" in mensagem.lower()
-        ):
-
-            return {
-                "status": "erro_cota",
-                "erro": (
-                    "Cota da Gemini excedida. "
-                    "Nenhuma nova tentativa foi realizada "
-                    "para evitar consumir mais requisições."
-                ),
-                "detalhes": mensagem,
-                "objetivo": objetivo,
-                "localizacao": localizacao
-            }
-
-        # Uma única tentativa adicional apenas
-        # para erros temporários de servidor.
-        if (
-            "503" in mensagem
-            or "UNAVAILABLE" in mensagem
-        ):
-
-            try:
-
-                time.sleep(2)
-
-                resposta = cliente.models.generate_content(
-                    model=MODELO,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json"
-                    )
-                )
-
-                texto = resposta.text.strip()
-
-                if texto.startswith("```"):
-                    texto = texto.replace(
-                        "```json",
-                        ""
-                    ).replace(
-                        "```",
-                        ""
-                    ).strip()
-
-                dados = json.loads(
-                    texto
-                )
-
-                return {
-                    "status": "sucesso",
-                    "objetivo": objetivo,
-                    "localizacao": localizacao,
-                    "decisao": dados.get(
-                        "decisao",
-                        {}
-                    ),
-                    "oportunidades": dados.get(
-                        "oportunidades",
-                        []
-                    ),
-                    "aprendizado_utilizado": dados.get(
-                        "aprendizado_utilizado",
-                        []
-                    ),
-                    "aprendizado_esperado": dados.get(
-                        "aprendizado_esperado"
-                    ),
-                    "proximo_passo": dados.get(
-                        "proximo_passo"
-                    ),
-                    "pesquisa_adicional_necessaria": dados.get(
-                        "pesquisa_adicional_necessaria",
-                        False
-                    ),
-                    "fontes_utilizadas": dados.get(
-                        "fontes_utilizadas",
-                        []
-                    )
-                }
-
-            except Exception as segundo_erro:
-
-                return {
-                    "status": "erro",
-                    "erro": str(
-                        segundo_erro
-                    ),
-                    "objetivo": objetivo,
-                    "localizacao": localizacao
-                }
-
         return {
             "status": "erro",
-            "erro": mensagem,
+            "erro": str(erro),
             "objetivo": objetivo,
             "localizacao": localizacao
         }
