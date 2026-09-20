@@ -4,6 +4,7 @@ import os
 from ai import analisar_oportunidade
 from agent import executar_ciclo
 from memory import obter_acoes_externas, atualizar_acao_externa
+from external import iniciar_acao_autorizada, consultar_acao_externa
 
 
 app = Flask(__name__)
@@ -190,9 +191,36 @@ def decidir_acao(acao_id, decisao):
         return jsonify({"erro": "Ação não encontrada."}), 404
     if acao.get("status") != "aguardando_autorizacao":
         return jsonify({"erro": "Esta ação já foi processada."}), 409
-    novo_status = "autorizada" if decisao == "autorizar" else "cancelada"
-    atualizar_acao_externa(acao_id, novo_status, {"origem": "interface_usuario"})
-    return jsonify({"status": novo_status, "mensagem": "Ação autorizada e registrada." if decisao == "autorizar" else "Ação recusada e cancelada."})
+    if decisao == "autorizar":
+        contexto = acao.get("contexto") or {}
+        if not (contexto.get("url_alvo") or "").startswith(("https://", "http://")):
+            return jsonify({"erro": "Esta ação ainda não possui uma URL de destino válida. Ela não pode ser executada."}), 400
+
+        atualizar_acao_externa(acao_id, "autorizada", {"origem": "interface_usuario"})
+        execucao = iniciar_acao_autorizada(acao_id)
+
+        if execucao.get("status") == "executando":
+            return jsonify({
+                "status": "executando",
+                "mensagem": "Ação autorizada e execução externa iniciada.",
+                "execucao": execucao
+            })
+
+        return jsonify({
+            "status": execucao.get("status", "falhou"),
+            "mensagem": "Ação autorizada, mas a execução não foi iniciada.",
+            "execucao": execucao
+        }), 502
+
+    atualizar_acao_externa(acao_id, "cancelada", {"origem": "interface_usuario"})
+    return jsonify({"status": "cancelada", "mensagem": "Ação recusada e cancelada."})
+
+
+@app.route("/acoes/<acao_id>/status")
+def status_acao(acao_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    return jsonify(consultar_acao_externa(acao_id))
 
 
 @app.route("/ciclo", methods=["POST"])
