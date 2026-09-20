@@ -142,7 +142,7 @@ class Executor:
         for item in resultados:
             url = (item.get("url") or "").strip()
             if any(host in url for host in (
-                "instagram.com/", "linkedin.com/in/"
+                "instagram.com/", "linkedin.com/in/", "facebook.com/", "business.site/", "google.com/maps/", "workana.com/", "99freelas.com/", "freelancer.com/"
             )):
                 candidatos.append({
                     "url": url,
