@@ -19,6 +19,7 @@ def memoria_padrao():
         "resultados": [],
         "ciclos": [],
         "testes": [],
+        "tarefas": [],
         "aprendizados": [],
         "financeiro": {
             "receita": 0,
@@ -339,6 +340,43 @@ def registrar_teste(
 
 
 # =========================================================
+# TAREFAS
+# =========================================================
+
+def registrar_tarefa(tarefa_id, descricao, acao, status="pendente", resultado=None, ciclo=None):
+    memoria = carregar_memoria()
+
+    tarefa = {
+        "data": agora(),
+        "id": tarefa_id,
+        "descricao": descricao,
+        "acao": acao,
+        "status": status,
+        "resultado": resultado,
+        "ciclo": ciclo
+    }
+
+    memoria["tarefas"].append(tarefa)
+    salvar_memoria(memoria)
+    return tarefa
+
+
+def atualizar_tarefa(tarefa_id, status, resultado=None):
+    memoria = carregar_memoria()
+
+    for tarefa in reversed(memoria["tarefas"]):
+        if tarefa.get("id") == tarefa_id:
+            tarefa["status"] = status
+            if resultado is not None:
+                tarefa["resultado"] = resultado
+            tarefa["atualizada_em"] = agora()
+            salvar_memoria(memoria)
+            return tarefa
+
+    return None
+
+
+# =========================================================
 # APRENDIZADO
 # =========================================================
 
@@ -432,5 +470,6 @@ def obter_resumo():
         "resultados": len(memoria["resultados"]),
         "ciclos": len(memoria["ciclos"]),
         "testes": len(memoria["testes"]),
+        "tarefas": len(memoria["tarefas"]),
         "aprendizados": len(memoria["aprendizados"])
     }
