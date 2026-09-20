@@ -150,6 +150,7 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
         decisao = {
             "acao": acao_executor,
             "estrategia": estrategia,
+            "objetivo": objetivo,
             "nicho": decisao_ia_detalhes.get("nicho"),
             "cliente_alvo": decisao_ia_detalhes.get(
                 "cliente_alvo"
@@ -174,7 +175,6 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
             ),
             "localizacao": localizacao,
             "precisa_permissao": False,
-            "localizacao": localizacao,
             "motivo": motivo
         }
 
