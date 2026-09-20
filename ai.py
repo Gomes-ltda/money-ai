@@ -263,8 +263,16 @@ Se for hora de produzir material:
 Se já existir uma estratégia pronta para teste:
 "testar_estrategia"
 
-Se a estratégia já tiver oferta, cliente-alvo, canal e proposta suficientes para uma primeira abordagem, mas ainda não tiver sido preparada uma ação externa:
+Se a estratégia já tiver oferta, cliente-alvo, proposta e um alvo específico identificado, e também tiver um canal exatamente igual a "instagram", "linkedin", "whatsapp" ou "email", com uma URL pública e específica do alvo no campo "url_alvo":
 "preparar_abordagem"
+
+REGRAS OBRIGATÓRIAS PARA "preparar_abordagem":
+- "canal" deve ser EXATAMENTE um destes valores: "instagram", "linkedin", "whatsapp" ou "email".
+- Não use descrições genéricas como "redes sociais", "mensagens diretas", "diretórios locais" ou "contato online".
+- "url_alvo" deve ser uma URL pública específica do alvo, começando por http:// ou https://.
+- O alvo deve estar claramente identificado na pesquisa atual.
+- Se canal ou url_alvo não estiverem disponíveis, NÃO escolha "preparar_abordagem". Escolha "pesquisar" para localizar um alvo específico ou "analisar" para estruturar melhor a oportunidade.
+- Nunca invente uma URL ou um alvo apenas para preencher o campo.
 
 Se nenhuma ação segura fizer sentido:
 "aguardar"
