@@ -22,6 +22,7 @@ def memoria_padrao():
         "tarefas": [],
         "aprendizados": [],
         "acoes_externas": [],
+        "pagamentos": [],
         "financeiro": {
             "receita": 0,
             "custos": 0
@@ -47,6 +48,9 @@ def garantir_estrutura(memoria):
 
     if not isinstance(memoria.get("acoes_externas"), list):
         memoria["acoes_externas"] = []
+
+    if not isinstance(memoria.get("pagamentos"), list):
+        memoria["pagamentos"] = []
 
     return memoria
 
@@ -307,6 +311,33 @@ def registrar_feedback_acao_externa(acao_id, resposta=None, interesse=None, vend
                 registrar_aprendizado("Ação externa recebeu indicação de interesse registrada pelo usuário.", estrategia=acao.get("estrategia"), evidencias=[{"acao_externa_id": acao_id, "feedback": feedback}], impacto="interesse_confirmado", acao="acompanhar_conversao", confianca="media", recomendacao="aguardar confirmação de venda antes de contabilizar receita")
             return feedback
     return None
+
+
+
+def registrar_pagamento(pagamento):
+    memoria = carregar_memoria()
+    pagamentos = memoria["pagamentos"]
+    pagamento_id = pagamento.get("id")
+    if pagamento_id and any(x.get("id") == pagamento_id for x in pagamentos):
+        return next(x for x in pagamentos if x.get("id") == pagamento_id)
+    pagamentos.append(pagamento)
+    salvar_memoria(memoria)
+    return pagamento
+
+
+def atualizar_pagamento(pagamento_id, **campos):
+    memoria = carregar_memoria()
+    for pagamento in reversed(memoria["pagamentos"]):
+        if pagamento.get("id") == pagamento_id:
+            pagamento.update({k: v for k, v in campos.items() if v is not None})
+            pagamento["atualizado_em"] = agora()
+            salvar_memoria(memoria)
+            return pagamento
+    return None
+
+
+def obter_pagamentos(limite=50):
+    return carregar_memoria()["pagamentos"][-limite:]
 
 
 def obter_metricas_comerciais(limite=100):
