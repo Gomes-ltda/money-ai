@@ -331,6 +331,10 @@ def criar_pagamento_pix():
     if valor <= 0:
         return jsonify({"erro": "O valor deve ser maior que zero."}), 400
 
+    email = str(dados.get("email", "")).strip()
+    if not email:
+        return jsonify({"erro": "Informe o e-mail do comprador para gerar a cobrança Pix."}), 400
+
     resultado = criar_cobranca_pix(
         valor=valor,
         descricao=str(dados.get("descricao", "Serviço Evolia")).strip() or "Serviço Evolia",
