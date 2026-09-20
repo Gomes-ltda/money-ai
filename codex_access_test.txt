@@ -1,0 +1,2 @@
+Teste de acesso de escrita do Codex/ChatGPT.
+Este arquivo será removido após o teste.
