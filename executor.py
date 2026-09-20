@@ -41,11 +41,16 @@ class Executor:
             return self.executar_pesquisa(decisao)
 
         if acao == "analisar":
-            return {
-                "status": "executado",
-                "acao": acao,
-                "resultado": "Análise autorizada."
-            }
+            return self.executar_analise(decisao)
+
+        if acao == "criar_oferta":
+            return self.criar_oferta(decisao)
+
+        if acao == "criar_proposta":
+            return self.criar_proposta(decisao)
+
+        if acao == "criar_conteudo":
+            return self.criar_conteudo(decisao)
 
         if acao == "testar_estrategia":
             return self.testar_estrategia(decisao)
@@ -53,8 +58,15 @@ class Executor:
         return {
             "status": "bloqueado",
             "acao": acao,
-            "motivo": "Executor ainda não possui essa ação."
+            "motivo": (
+                "Executor ainda não possui "
+                "essa ação."
+            )
         }
+
+    # --------------------------------------------------
+    # PESQUISA
+    # --------------------------------------------------
 
     def executar_pesquisa(self, decisao):
 
@@ -68,10 +80,13 @@ class Executor:
             return {
                 "status": "erro",
                 "acao": "pesquisar",
-                "motivo": "Nenhuma consulta foi definida."
+                "motivo": (
+                    "Nenhuma consulta foi definida."
+                )
             }
 
         try:
+
             resultado = pesquisar(consulta)
 
             return {
@@ -82,6 +97,7 @@ class Executor:
             }
 
         except Exception as erro:
+
             return {
                 "status": "erro",
                 "acao": "pesquisar",
@@ -89,32 +105,266 @@ class Executor:
                 "motivo": str(erro)
             }
 
+    # --------------------------------------------------
+    # ANÁLISE
+    # --------------------------------------------------
+
+    def executar_analise(self, decisao):
+
+        dados = decisao.get("dados")
+
+        if not dados:
+            dados = decisao.get("pesquisa")
+
+        if not dados:
+            return {
+                "status": "erro",
+                "acao": "analisar",
+                "motivo": (
+                    "Nenhum dado foi fornecido "
+                    "para análise."
+                )
+            }
+
+        return {
+            "status": "executado",
+            "acao": "analisar",
+            "resultado": (
+                "Dados preparados para análise "
+                "pelo Cérebro."
+            ),
+            "dados": dados
+        }
+
+    # --------------------------------------------------
+    # CRIAÇÃO DE OFERTA
+    # --------------------------------------------------
+
+    def criar_oferta(self, decisao):
+
+        estrategia = decisao.get(
+            "estrategia",
+            ""
+        )
+
+        nicho = decisao.get(
+            "nicho",
+            ""
+        )
+
+        problema = decisao.get(
+            "problema",
+            ""
+        )
+
+        cliente = decisao.get(
+            "cliente_alvo",
+            ""
+        )
+
+        oferta = decisao.get(
+            "oferta",
+            ""
+        )
+
+        preco = decisao.get(
+            "preco_teste",
+            ""
+        )
+
+        if not oferta:
+
+            return {
+                "status": "erro",
+                "acao": "criar_oferta",
+                "motivo": (
+                    "Nenhuma descrição de oferta "
+                    "foi fornecida."
+                )
+            }
+
+        proposta = {
+            "nome": (
+                "Oferta de teste - "
+                f"{estrategia}"
+            ),
+            "cliente_alvo": cliente,
+            "nicho": nicho,
+            "problema": problema,
+            "servico": oferta,
+            "preco_teste": preco,
+            "custo_teste": 0,
+            "objetivo": (
+                "Validar interesse real "
+                "sem investimento inicial."
+            )
+        }
+
+        return {
+            "status": "executado",
+            "acao": "criar_oferta",
+            "resultado": proposta,
+            "custo": 0,
+            "receita": 0
+        }
+
+    # --------------------------------------------------
+    # CRIAÇÃO DE PROPOSTA
+    # --------------------------------------------------
+
+    def criar_proposta(self, decisao):
+
+        cliente = decisao.get(
+            "cliente_alvo",
+            ""
+        )
+
+        problema = decisao.get(
+            "problema",
+            ""
+        )
+
+        oferta = decisao.get(
+            "oferta",
+            ""
+        )
+
+        preco = decisao.get(
+            "preco_teste",
+            ""
+        )
+
+        canal = decisao.get(
+            "canal",
+            ""
+        )
+
+        if not oferta:
+
+            return {
+                "status": "erro",
+                "acao": "criar_proposta",
+                "motivo": (
+                    "Oferta não definida."
+                )
+            }
+
+        texto = (
+            "PROPOSTA COMERCIAL\n\n"
+            f"Cliente-alvo: {cliente}\n\n"
+            f"Problema identificado: {problema}\n\n"
+            f"Serviço oferecido: {oferta}\n\n"
+            f"Canal previsto: {canal}\n\n"
+            f"Preço inicial de teste: {preco}\n\n"
+            "Objetivo: realizar um teste inicial "
+            "com baixo risco e sem investimento "
+            "financeiro da Money AI.\n"
+        )
+
+        return {
+            "status": "executado",
+            "acao": "criar_proposta",
+            "resultado": {
+                "texto": texto,
+                "cliente_alvo": cliente,
+                "oferta": oferta,
+                "preco": preco
+            },
+            "custo": 0,
+            "receita": 0
+        }
+
+    # --------------------------------------------------
+    # CRIAÇÃO DE CONTEÚDO
+    # --------------------------------------------------
+
+    def criar_conteudo(self, decisao):
+
+        tema = (
+            decisao.get("tema")
+            or decisao.get("oferta")
+            or decisao.get("estrategia")
+        )
+
+        if not tema:
+
+            return {
+                "status": "erro",
+                "acao": "criar_conteudo",
+                "motivo": (
+                    "Nenhum tema foi definido."
+                )
+            }
+
+        return {
+            "status": "executado",
+            "acao": "criar_conteudo",
+            "resultado": {
+                "tema": tema,
+                "status": (
+                    "Conteúdo preparado "
+                    "para revisão."
+                )
+            },
+            "custo": 0,
+            "receita": 0
+        }
+
+    # --------------------------------------------------
+    # TESTE DE ESTRATÉGIA
+    # --------------------------------------------------
+
     def testar_estrategia(self, decisao):
 
-        analise = decisao.get("analise", {})
-        estrategia = decisao.get("estrategia")
+        analise = decisao.get(
+            "analise",
+            {}
+        )
 
-        if not estrategia and isinstance(analise, dict):
-            estrategia = analise.get("estrategia")
+        estrategia = decisao.get(
+            "estrategia"
+        )
+
+        if not estrategia and isinstance(
+            analise,
+            dict
+        ):
+            estrategia = analise.get(
+                "estrategia"
+            )
 
         texto_analise = ""
 
-        if isinstance(analise, dict):
-            texto_analise = analise.get("analise", "")
+        if isinstance(
+            analise,
+            dict
+        ):
+            texto_analise = analise.get(
+                "analise",
+                ""
+            )
 
-        elif isinstance(analise, str):
+        elif isinstance(
+            analise,
+            str
+        ):
             texto_analise = analise
 
         if not estrategia and texto_analise:
-            estrategia = self.extrair_estrategia(texto_analise)
+
+            estrategia = self.extrair_estrategia(
+                texto_analise
+            )
 
         if not estrategia:
+
             return {
                 "status": "erro",
                 "acao": "testar_estrategia",
                 "motivo": (
                     "Não foi possível identificar "
-                    "a estratégia escolhida pelo Cérebro."
+                    "a estratégia escolhida pelo "
+                    "Cérebro."
                 )
             }
 
@@ -123,40 +373,39 @@ class Executor:
             texto_analise
         )
 
-        # Execução R$0.
-        # Nesta fase a IA pode pesquisar e preparar
-        # uma operação, mas não pode publicar,
-        # mandar mensagens, criar contas ou gastar dinheiro.
-
-        pesquisa_consulta = self.criar_consulta_pesquisa(
-            estrategia,
-            plano
+        pesquisa_consulta = (
+            self.criar_consulta_pesquisa(
+                estrategia,
+                plano
+            )
         )
 
-        pesquisa_resultado = self.executar_pesquisa({
-            "consulta": pesquisa_consulta
-        })
+        pesquisa_resultado = (
+            self.executar_pesquisa({
+                "consulta":
+                    pesquisa_consulta
+            })
+        )
 
         return {
             "status": "executado",
             "acao": "testar_estrategia",
             "tipo": "teste_r0",
-
             "estrategia": estrategia,
-
             "hipotese": plano["hipotese"],
-
-            "objetivo_teste": plano["objetivo_teste"],
-
-            "acoes_planejadas": plano["acoes_planejadas"],
-
+            "objetivo_teste": (
+                plano["objetivo_teste"]
+            ),
+            "acoes_planejadas": (
+                plano["acoes_planejadas"]
+            ),
             "pesquisa": {
-                "consulta": pesquisa_consulta,
-                "resultado": pesquisa_resultado
+                "consulta":
+                    pesquisa_consulta,
+                "resultado":
+                    pesquisa_resultado
             },
-
             "metricas": plano["metricas"],
-
             "restricoes": {
                 "custo_maximo": 0,
                 "publicacao_externa": False,
@@ -164,28 +413,36 @@ class Executor:
                 "movimentacao_financeira": False,
                 "criacao_de_contas": False
             },
-
             "custo_planejado": 0,
             "custo_real": 0,
             "receita": 0,
             "resultado": 0,
-
             "proximo_passo": (
-                "Analisar os resultados da pesquisa, "
-                "identificar oportunidades concretas "
+                "Analisar os resultados da pesquisa "
                 "e preparar uma oferta R$0."
             )
         }
 
-    def criar_consulta_pesquisa(self, estrategia, plano):
+    # --------------------------------------------------
+    # AUXILIARES
+    # --------------------------------------------------
+
+    def criar_consulta_pesquisa(
+        self,
+        estrategia,
+        plano
+    ):
 
         return (
-            f"Pesquise oportunidades reais de geração de receita "
-            f"para a seguinte estratégia: {estrategia}. "
+            "Pesquise oportunidades reais de "
+            "geração de receita para a seguinte "
+            f"estratégia: {estrategia}. "
             f"Objetivo: {plano['objetivo_teste']}. "
-            f"Identifique demanda, potenciais clientes, "
-            f"problemas existentes, concorrentes, preços praticados "
-            f"e formas de testar a oferta sem investimento inicial."
+            "Identifique demanda, potenciais "
+            "clientes, problemas existentes, "
+            "concorrentes, preços praticados "
+            "e formas de testar a oferta sem "
+            "investimento inicial."
         )
 
     def extrair_estrategia(self, texto):
@@ -206,20 +463,36 @@ class Executor:
 
             if resultado:
 
-                estrategia = resultado.group(1).strip()
+                estrategia = (
+                    resultado.group(1)
+                    .strip()
+                )
 
-                estrategia = estrategia.split("\n")[0].strip()
+                estrategia = (
+                    estrategia
+                    .split("\n")[0]
+                    .strip()
+                )
 
                 if len(estrategia) > 200:
-                    estrategia = estrategia[:200].strip()
+                    estrategia = (
+                        estrategia[:200]
+                        .strip()
+                    )
 
                 return estrategia.rstrip(".")
 
         return None
 
-    def criar_plano_teste(self, estrategia, texto_analise):
+    def criar_plano_teste(
+        self,
+        estrategia,
+        texto_analise
+    ):
 
-        estrategia_lower = estrategia.lower()
+        estrategia_lower = (
+            estrategia.lower()
+        )
 
         if (
             "automação" in estrategia_lower
@@ -228,9 +501,10 @@ class Executor:
         ):
 
             hipotese = (
-                "Pequenas empresas podem ter problemas "
-                "operacionais que podem ser resolvidos "
-                "com automação ou ferramentas de IA."
+                "Pequenas empresas podem ter "
+                "problemas operacionais que "
+                "podem ser resolvidos com "
+                "automação ou ferramentas de IA."
             )
 
             objetivo = (
@@ -254,12 +528,15 @@ class Executor:
             or "freela" in estrategia_lower
             or "serviço" in estrategia_lower
             or "servico" in estrategia_lower
+            or "suporte" in estrategia_lower
+            or "atendimento" in estrategia_lower
         ):
 
             hipotese = (
-                "Existe demanda por serviços digitais "
-                "específicos que podem ser oferecidos "
-                "sem investimento inicial."
+                "Existe demanda por serviços "
+                "operacionais específicos que "
+                "podem ser oferecidos sem "
+                "investimento inicial."
             )
 
             objetivo = (
@@ -274,16 +551,16 @@ class Executor:
                 "Pesquisar concorrentes.",
                 "Pesquisar preços.",
                 "Definir uma oferta inicial.",
-                "Preparar uma demonstração.",
+                "Preparar uma proposta.",
                 "Registrar os resultados."
             ]
 
         else:
 
             hipotese = (
-                "A estratégia identificada pode possuir "
-                "uma oportunidade de geração de receita "
-                "sem investimento inicial."
+                "A estratégia identificada pode "
+                "possuir uma oportunidade de geração "
+                "de receita sem investimento inicial."
             )
 
             objetivo = (
@@ -297,7 +574,6 @@ class Executor:
                 "Definir o público-alvo.",
                 "Pesquisar demanda.",
                 "Pesquisar concorrentes.",
-                "Pesquisar preços.",
                 "Criar uma proposta inicial.",
                 "Registrar os resultados."
             ]
@@ -325,4 +601,6 @@ def executar(decisao):
 
     executor = Executor()
 
-    return executor.executar(decisao)
+    return executor.executar(
+        decisao
+    )
