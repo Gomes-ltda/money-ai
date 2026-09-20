@@ -21,6 +21,21 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "auto").strip().lower()
 MODELOS = [modelo.strip() for modelo in os.getenv("GEMINI_MODELS", "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash-lite").split(",") if modelo.strip()]
 
 
+def _extrair_json(texto):
+    texto = (texto or "").strip()
+    if texto.startswith("```"):
+        texto = texto.replace("```json", "").replace("```", "").strip()
+
+    try:
+        return json.loads(texto)
+    except json.JSONDecodeError:
+        inicio = texto.find("{")
+        fim = texto.rfind("}")
+        if inicio >= 0 and fim > inicio:
+            return json.loads(texto[inicio:fim + 1])
+        raise
+
+
 def _gerar_json(cliente, prompt):
     ultimo_erro = None
     for modelo in MODELOS:
@@ -30,10 +45,8 @@ def _gerar_json(cliente, prompt):
                 contents=prompt,
                 config=types.GenerateContentConfig(response_mime_type="application/json")
             )
-            texto = resposta.text.strip()
-            if texto.startswith("```"):
-                texto = texto.replace("```json", "").replace("```", "").strip()
-            return json.loads(texto), modelo, None
+            dados = _extrair_json(resposta.text)
+            return dados, modelo, None
         except Exception as erro:
             mensagem = str(erro)
             ultimo_erro = mensagem
@@ -41,7 +54,7 @@ def _gerar_json(cliente, prompt):
                     "503" in mensagem or "UNAVAILABLE" in mensagem or
                     "high demand" in mensagem.lower()):
                 continue
-            return None, modelo, mensagem
+            continue
     return None, None, ultimo_erro
 
 def _gerar_openai(prompt):
@@ -67,7 +80,7 @@ def _gerar_openai(prompt):
         texto = texto.strip()
         if texto.startswith("```"):
             texto = texto.replace("```json", "").replace("```", "").strip()
-        return json.loads(texto), OPENAI_MODEL, None
+        return _extrair_json(texto), OPENAI_MODEL, None
     except Exception as erro:
         return None, OPENAI_MODEL, str(erro)
 
@@ -304,6 +317,34 @@ FORMATO:
                 modelo_usado = modelo_openai
             else:
                 mensagem = erro_openai or erro or "Nenhum provedor de IA conseguiu responder."
+                if provider == "auto":
+                    return {
+                        "status": "modo_degradado",
+                        "objetivo": objetivo,
+                        "localizacao": localizacao,
+                        "modelo_utilizado": None,
+                        "ai_provider": provider,
+                        "degradacao": True,
+                        "erro": mensagem,
+                        "detalhes": erro,
+                        "erro_openai": erro_openai,
+                        "modelos_tentados": MODELOS,
+                        "openai_configurado": bool(OPENAI_API_KEY),
+                        "decisao": {
+                            "estrategia": "pesquisa incremental de oportunidades",
+                            "acao_executor": "pesquisar",
+                            "acao_imediata": objetivo,
+                            "precisa_permissao": False,
+                            "motivo_escolha": "Os provedores de IA estão indisponíveis; a Evolia continuará coletando dados sem fingir que uma decisão inteligente foi produzida."
+                        },
+                        "oportunidades": [],
+                        "aprendizado_utilizado": [],
+                        "aprendizado_esperado": "Coletar dados adicionais para o próximo ciclo.",
+                        "proximo_passo": "Executar pesquisa e tentar novamente a análise em um ciclo posterior.",
+                        "pesquisa_adicional_necessaria": True,
+                        "fontes_utilizadas": []
+                    }
+
                 return {
                     "status": "erro_cota" if ("429" in mensagem or "RESOURCE_EXHAUSTED" in mensagem or "quota" in mensagem.lower()) else "erro",
                     "erro": mensagem,
@@ -321,7 +362,7 @@ FORMATO:
             "objetivo": objetivo,
             "localizacao": localizacao,
             "modelo_utilizado": modelo_usado,
-            "ai_provider": AI_PROVIDER,
+            "ai_provider": provider,
             "decisao": dados.get("decisao", {}),
             "oportunidades": dados.get("oportunidades", []),
             "aprendizado_utilizado": dados.get("aprendizado_utilizado", []),
@@ -332,6 +373,29 @@ FORMATO:
         }
 
     except Exception as erro:
+        if provider == "auto":
+            return {
+                "status": "modo_degradado",
+                "objetivo": objetivo,
+                "localizacao": localizacao,
+                "modelo_utilizado": None,
+                "ai_provider": provider,
+                "degradacao": True,
+                "erro": str(erro),
+                "decisao": {
+                    "estrategia": "pesquisa incremental de oportunidades",
+                    "acao_executor": "pesquisar",
+                    "acao_imediata": objetivo,
+                    "precisa_permissao": False,
+                    "motivo_escolha": "Falha inesperada no cérebro; continuar pesquisando é a ação segura."
+                },
+                "oportunidades": [],
+                "aprendizado_utilizado": [],
+                "aprendizado_esperado": "Coletar dados adicionais para nova análise.",
+                "proximo_passo": "Pesquisar e tentar nova análise posteriormente.",
+                "pesquisa_adicional_necessaria": True,
+                "fontes_utilizadas": []
+            }
         return {
             "status": "erro",
             "erro": str(erro),
