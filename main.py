@@ -367,6 +367,27 @@ def status_acao(acao_id):
     return jsonify(consultar_acao_externa(acao_id))
 
 
+@app.route("/pagamentos/sincronizar-pendentes", methods=["POST"])
+def pagamentos_sincronizar_pendentes():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    if not verificar_token_aprovacao(token):
+        return jsonify({"erro": "Não autorizado."}), 401
+
+    pendentes = [
+        p for p in obter_pagamentos(limite=200)
+        if p.get("status") in {"aguardando_pagamento", "processando", "pendente"}
+    ]
+    resultados = []
+    for pagamento in pendentes:
+        resultados.append(sincronizar_pagamento(pagamento.get("id")))
+
+    return jsonify({
+        "status": "sincronizado",
+        "quantidade": len(resultados),
+        "resultados": resultados
+    })
+
+
 @app.route("/pagamentos/<pagamento_id>/sincronizar", methods=["POST"])
 def pagamento_sincronizar(pagamento_id):
     token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
