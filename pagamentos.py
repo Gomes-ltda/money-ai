@@ -76,6 +76,7 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None, acao_id=No
             "provedor": "mercado_pago",
             "tipo": "pix",
             "status": "aguardando_pagamento",
+            "status_detail": "aguardando_pagamento",
             "valor": valor,
             "descricao": descricao,
             "referencia": referencia,
