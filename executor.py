@@ -7,7 +7,7 @@ from memory import registrar_evento, registrar_teste, registrar_acao_externa, ob
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "preparar_abordagem", "testar_estrategia"
+    "criar_proposta", "criar_conteudo", "preparar_abordagem", "pesquisar_alvo", "testar_estrategia"
 }
 
 def agora():
@@ -40,6 +40,8 @@ class Executor:
                 resultado = self.criar_proposta(decisao)
             elif acao == "criar_conteudo":
                 resultado = self.criar_conteudo(decisao)
+            elif acao == "pesquisar_alvo":
+                resultado = self.pesquisar_alvo(decisao)
             elif acao == "preparar_abordagem":
                 resultado = self.preparar_abordagem(decisao)
             elif acao == "testar_estrategia":
@@ -130,6 +132,48 @@ class Executor:
         registrar_evento("conteudo_criado", f"Conteúdo preparado para o canal: {decisao.get('canal')}")
         return {"status": "executado", "acao": "criar_conteudo", "resultado": {"receita": 0, "custo": 0, "conteudo": conteudo}}
 
+    def pesquisar_alvo(self, decisao):
+        cliente = decisao.get("cliente_alvo") or "pequenos negócios"
+        nicho = decisao.get("nicho") or ""
+        consulta = f'"{cliente}" {nicho} perfil Instagram negócio Brasil site:instagram.com OR site:linkedin.com'
+        pesquisa = pesquisar(consulta, decisao.get("localizacao", "Brasil"))
+        resultados = pesquisa.get("resultados", []) if isinstance(pesquisa, dict) else []
+        candidatos = []
+        for item in resultados:
+            url = (item.get("url") or "").strip()
+            if any(host in url for host in (
+                "instagram.com/", "linkedin.com/in/"
+            )):
+                candidatos.append({
+                    "url": url,
+                    "titulo": item.get("titulo"),
+                    "site": item.get("site"),
+                    "resumo": item.get("resumo")
+                })
+        if not candidatos:
+            return {
+                "status": "bloqueado",
+                "acao": "pesquisar_alvo",
+                "motivo": "Nenhum alvo público específico foi encontrado em Instagram ou LinkedIn.",
+                "consulta": consulta,
+                "resultado": {"receita": 0, "custo": 0, "candidatos": []}
+            }
+        alvo = candidatos[0]
+        canal = "linkedin" if "linkedin.com/in/" in alvo["url"] else "instagram"
+        registrar_evento("alvo_pesquisado", f"Alvo público encontrado: {alvo['url']} via {canal}.")
+        return {
+            "status": "executado",
+            "acao": "pesquisar_alvo",
+            "consulta": consulta,
+            "resultado": {
+                "receita": 0,
+                "custo": 0,
+                "url_alvo": alvo["url"],
+                "canal": canal,
+                "alvo_encontrado": alvo
+            }
+        }
+
     def preparar_abordagem(self, decisao):
         anterior = decisao.get("resultado_anterior") or {}
         proposta_anterior = None
@@ -138,6 +182,11 @@ class Executor:
         cliente = decisao.get("cliente_alvo", "cliente potencial")
         canal = decisao.get("canal", "canal não definido")
         url_alvo = (decisao.get("url_alvo") or "").strip()
+        if isinstance(anterior, dict):
+            resultado_anterior = anterior.get("resultado", {})
+            if isinstance(resultado_anterior, dict):
+                canal = resultado_anterior.get("canal") or canal
+                url_alvo = (resultado_anterior.get("url_alvo") or url_alvo).strip()
         if canal not in {"instagram", "linkedin", "whatsapp", "email"}:
             return {"status": "bloqueado", "acao": "preparar_abordagem", "motivo": "Canal externo não suportado ou não definido."}
         if not url_alvo.startswith(("https://", "http://")):
