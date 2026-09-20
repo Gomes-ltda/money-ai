@@ -370,7 +370,8 @@ def status_acao(acao_id):
 @app.route("/pagamentos/sincronizar-pendentes", methods=["POST"])
 def pagamentos_sincronizar_pendentes():
     token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
-    if not verificar_token_aprovacao(token):
+    cron_token = os.getenv("EVOLIA_CRON_TOKEN", "").strip()
+    if not verificar_token_aprovacao(token) and (not cron_token or token != cron_token):
         return jsonify({"erro": "Não autorizado."}), 401
 
     pendentes = [
