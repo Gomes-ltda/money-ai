@@ -150,6 +150,41 @@ def validar_webhook(headers, data_id):
     return hmac.compare_digest(esperado, recebido)
 
 
+def sincronizar_pagamento(pagamento_id):
+    if not pagamento_id:
+        return {"status": "erro", "erro": "Pagamento não informado."}
+
+    existente = next((x for x in obter_pagamentos() if str(x.get("id")) == str(pagamento_id)), None)
+    if not existente:
+        return {"status": "nao_encontrado", "erro": "Pagamento não registrado pela Evolia."}
+
+    order = consultar_order(str(pagamento_id))
+    if not order:
+        return {"status": "indisponivel", "pagamento": existente}
+
+    status_order = order.get("status")
+    status_detail = order.get("status_detail")
+    pagamentos = ((order.get("transactions") or {}).get("payments") or [])
+    status_pagamento = pagamentos[0].get("status") if pagamentos else None
+
+    if status_order == "processed" or status_pagamento in {"approved", "processed"}:
+        novo_status = "pago"
+    elif status_order in {"canceled", "cancelled", "rejected", "failed", "expired"} or status_pagamento in {"rejected", "cancelled", "canceled", "refunded", "charged_back"}:
+        novo_status = "falhou"
+    else:
+        novo_status = existente.get("status") or "aguardando_pagamento"
+
+    atualizar_pagamento(
+        pagamento_id,
+        status=novo_status,
+        status_provedor=status_order or status_pagamento,
+        status_detail=status_detail,
+        ultima_sincronizacao_em=agora()
+    )
+    final = next((x for x in obter_pagamentos() if str(x.get("id")) == str(pagamento_id)), existente)
+    return {"status": "sincronizado", "pagamento": final}
+
+
 def processar_webhook(payload, data_id):
     if not data_id:
         return {"status": "ignorado", "motivo": "data.id ausente"}
