@@ -6,7 +6,7 @@ from agent import executar_ciclo
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
 from pagamentos import criar_cobranca_pix, validar_webhook, processar_webhook
-from memory import obter_pagamentos
+from memory import obter_pagamentos, atualizar_pagamento
 
 
 app = Flask(__name__)
@@ -339,7 +339,10 @@ def criar_pagamento_pix():
     )
     if resultado.get("status") == "criado":
         pagamento = resultado.get("pagamento") or {}
-        pagamento["estrategia"] = str(dados.get("estrategia", "")).strip() or None
+        estrategia = str(dados.get("estrategia", "")).strip() or None
+        if estrategia and pagamento.get("id"):
+            atualizar_pagamento(pagamento["id"], estrategia=estrategia)
+            pagamento["estrategia"] = estrategia
     return jsonify(resultado), (200 if resultado.get("status") == "criado" else 400)
 
 
