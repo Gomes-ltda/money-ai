@@ -1,5 +1,6 @@
 from ai import analisar_oportunidade
 from executor import Executor
+from tasks import GerenciadorTarefas
 
 from memory import (
     registrar_ciclo,
@@ -8,264 +9,147 @@ from memory import (
     obter_ultimos_aprendizados
 )
 
-
 ACOES_PERMITIDAS = {
-    "aguardar",
-    "pesquisar",
-    "analisar",
-    "criar_oferta",
-    "criar_proposta",
-    "criar_conteudo",
-    "testar_estrategia"
+    "aguardar", "pesquisar", "analisar", "criar_oferta",
+    "criar_proposta", "criar_conteudo", "testar_estrategia"
 }
+
+MAX_TAREFAS_POR_CICLO = 3
+
+
+def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
+    return {
+        "acao": acao,
+        "estrategia": detalhes.get("estrategia"),
+        "objetivo": objetivo,
+        "nicho": detalhes.get("nicho"),
+        "cliente_alvo": detalhes.get("cliente_alvo"),
+        "problema": detalhes.get("problema"),
+        "oferta": detalhes.get("oferta"),
+        "canal": detalhes.get("canal"),
+        "preco_teste": detalhes.get("preco_teste"),
+        "custo_teste": detalhes.get("custo_teste"),
+        "acao_imediata": detalhes.get("acao_imediata"),
+        "localizacao": localizacao,
+        "precisa_permissao": False,
+        "motivo": motivo
+    }
 
 
 def executar_ciclo(objetivo, localizacao="Brasil"):
     memoria = obter_ultimos_aprendizados(10)
 
-    # =========================================================
-    # 1. CÉREBRO
-    # =========================================================
-
     decisao_ia = analisar_oportunidade(
-        objetivo,
-        localizacao,
-        contexto_memoria=memoria
+        objetivo, localizacao, contexto_memoria=memoria
     )
 
-    # =========================================================
-    # 2. ERROS DO CÉREBRO
-    # =========================================================
-
-    if decisao_ia.get("status") in {
-        "erro_cota",
-        "erro",
-        "erro_configuracao"
-    }:
-
+    if decisao_ia.get("status") in {"erro_cota", "erro", "erro_configuracao"}:
         ciclo = registrar_ciclo(
-            objetivo=objetivo,
-            localizacao=localizacao,
-            pesquisa=None,
+            objetivo=objetivo, localizacao=localizacao, pesquisa=None,
             analise=decisao_ia,
-            decisao={
-                "acao": "aguardar",
-                "motivo": (
-                    "O Cérebro não está disponível no momento. "
-                    "O ciclo será interrompido sem repetir ações."
-                )
-            },
-            execucao={
-                "acao": "aguardar",
-                "status": "bloqueado"
-            },
-            medicao={
-                "receita": 0,
-                "custo": 0,
-                "resultado": 0,
-                "status": "aguardando_cerebro"
-            }
+            decisao={"acao": "aguardar", "motivo": "O Cérebro não está disponível no momento."},
+            execucao={"acao": "aguardar", "status": "bloqueado"},
+            medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "aguardando_cerebro"}
         )
-
         return {
             "status": "aguardando_cerebro",
-            "motivo": decisao_ia.get(
-                "erro",
-                "Cérebro indisponível."
-            ),
+            "motivo": decisao_ia.get("erro", "Cérebro indisponível."),
             "decisao_ia": decisao_ia,
-            "decisao": {
-                "acao": "aguardar"
-            },
-            "execucao": {
-                "acao": "aguardar",
-                "status": "bloqueado"
-            },
-            "medicao": {
-                "receita": 0,
-                "custo": 0,
-                "resultado": 0,
-                "status": "aguardando_cerebro"
-            },
+            "decisao": {"acao": "aguardar"},
+            "execucao": {"acao": "aguardar", "status": "bloqueado"},
+            "medicao": {"receita": 0, "custo": 0, "resultado": 0, "status": "aguardando_cerebro"},
             "ciclo_memoria": ciclo
         }
 
-    # =========================================================
-    # 3. EXTRAI DECISÃO DA IA
-    # =========================================================
+    detalhes = decisao_ia.get("decisao", {})
+    acao_inicial = detalhes.get("acao_executor", decisao_ia.get("acao_executor"))
 
-    decisao_ia_detalhes = decisao_ia.get("decisao", {})
-
-    estrategia = decisao_ia_detalhes.get(
-        "estrategia"
-    )
-
-    acao_executor = decisao_ia_detalhes.get(
-        "acao_executor",
-        decisao_ia.get("acao_executor")
-    )
-
-    precisa_permissao = decisao_ia_detalhes.get(
-        "precisa_permissao",
-        False
-    )
-
-    # =========================================================
-    # 4. VALIDA AÇÃO
-    # =========================================================
-
-    if acao_executor not in ACOES_PERMITIDAS:
-
-        acao_executor = "aguardar"
-
-        motivo = (
-            "A IA retornou uma ação inexistente ou não autorizada "
-            "pela arquitetura atual."
-        )
-
+    if acao_inicial not in ACOES_PERMITIDAS:
+        acao_inicial = "aguardar"
+        motivo = "A IA retornou uma ação inexistente ou não autorizada."
     else:
-        motivo = (
-            "Ação escolhida pelo Cérebro "
-            "com base na análise e memória."
-        )
+        motivo = "Ação escolhida pelo Cérebro com base na análise e memória."
 
-    # =========================================================
-    # 5. SE PRECISAR DE PERMISSÃO
-    # =========================================================
-
-    if precisa_permissao:
-
+    if detalhes.get("precisa_permissao", False):
         decisao = {
             "acao": "aguardar",
-            "acao_solicitada": acao_executor,
-            "estrategia": estrategia,
+            "acao_solicitada": acao_inicial,
+            "estrategia": detalhes.get("estrategia"),
             "precisa_permissao": True,
-            "motivo": (
-                "A próxima ação exige autorização do usuário."
-            )
+            "motivo": "A próxima ação exige autorização do usuário."
         }
-
+        execucao = Executor().executar(decisao)
+        tarefas = []
     else:
+        decisao = _montar_decisao(detalhes, acao_inicial, objetivo, localizacao, motivo)
+        gerenciador = GerenciadorTarefas()
+        tarefas = gerenciador.criar(decisao)
+        executor = Executor()
+        execucoes = []
 
-        decisao = {
-            "acao": acao_executor,
-            "estrategia": estrategia,
-            "objetivo": objetivo,
-            "nicho": decisao_ia_detalhes.get("nicho"),
-            "cliente_alvo": decisao_ia_detalhes.get(
-                "cliente_alvo"
-            ),
-            "problema": decisao_ia_detalhes.get(
-                "problema"
-            ),
-            "oferta": decisao_ia_detalhes.get(
-                "oferta"
-            ),
-            "canal": decisao_ia_detalhes.get(
-                "canal"
-            ),
-            "preco_teste": decisao_ia_detalhes.get(
-                "preco_teste"
-            ),
-            "custo_teste": decisao_ia_detalhes.get(
-                "custo_teste"
-            ),
-            "acao_imediata": decisao_ia_detalhes.get(
-                "acao_imediata"
-            ),
-            "localizacao": localizacao,
-            "precisa_permissao": False,
-            "motivo": motivo
+        for tarefa in tarefas[:MAX_TAREFAS_POR_CICLO]:
+            tarefa_decisao = dict(decisao)
+            tarefa_decisao["acao"] = tarefa["acao"]
+
+            try:
+                resultado_tarefa = executor.executar(tarefa_decisao)
+                if resultado_tarefa.get("status") in {"erro", "bloqueado"}:
+                    gerenciador.falhar(tarefa, resultado_tarefa)
+                    execucoes.append(resultado_tarefa)
+                    break
+
+                gerenciador.concluir(tarefa, resultado_tarefa)
+                execucoes.append(resultado_tarefa)
+            except Exception as erro:
+                gerenciador.falhar(tarefa, {"erro": str(erro)})
+                execucoes.append({"status": "erro", "acao": tarefa["acao"], "erro": str(erro)})
+                break
+
+        execucao = {
+            "status": "executado" if execucoes else "sem_execucao",
+            "acao": acao_inicial,
+            "tarefas_planejadas": tarefas,
+            "tarefas_executadas": len(execucoes),
+            "execucoes": execucoes
         }
 
-    # =========================================================
-    # 6. EXECUTOR
-    # =========================================================
-
-    executor = Executor()
-
-    execucao = executor.executar(decisao)
-
-    # =========================================================
-    # 7. MEDIÇÃO
-    # =========================================================
-
-    resultado_execucao = execucao.get(
-        "resultado",
-        {}
-    )
-
-    receita = resultado_execucao.get(
-        "receita",
-        0
-    )
-
-    custo = resultado_execucao.get(
-        "custo",
-        0
-    )
+    receita = 0
+    custo = 0
+    for item in execucao.get("execucoes", [execucao]):
+        resultado_item = item.get("resultado", {})
+        receita += resultado_item.get("receita", 0) or 0
+        custo += resultado_item.get("custo", 0) or 0
 
     resultado = receita - custo
-
     medicao = {
-        "receita": receita,
-        "custo": custo,
-        "resultado": resultado,
-        "status": execucao.get(
-            "status",
-            "executado"
-        )
+        "receita": receita, "custo": custo, "resultado": resultado,
+        "status": execucao.get("status", "executado")
     }
 
-    # =========================================================
-    # 8. REGISTRA RESULTADO
-    # =========================================================
-
+    estrategia = detalhes.get("estrategia")
     if estrategia:
-
         registrar_resultado(
+            estrategia=estrategia, receita=receita, custo=custo,
+            resultado=resultado, acao=acao_inicial,
+            evidencias=execucao.get("execucoes", [])
+        )
+        registrar_aprendizado(
+            aprendizado=(
+                "A estratégia '{}' executou {} tarefa(s). "
+                "Resultado financeiro: R$" + "{:.2f}."
+            ).format(estrategia, execucao.get("tarefas_executadas", 0), resultado),
             estrategia=estrategia,
-            receita=receita,
-            custo=custo,
-            resultado=resultado
+            evidencias=execucao.get("execucoes", []),
+            impacto=resultado,
+            acao=acao_inicial
         )
 
-    # =========================================================
-    # 9. APRENDIZADO
-    # =========================================================
-
-    registrar_aprendizado(
-        aprendizado=(
-            f"A estratégia '{estrategia}' teve "
-            f"a ação '{decisao.get('acao')}' executada. "
-            f"Resultado financeiro: R${resultado:.2f}."
-        ),
-        estrategia=estrategia,
-        evidencias=[
-            execucao
-        ],
-        impacto=resultado
-    )
-
-    # =========================================================
-    # 10. MEMÓRIA DO CICLO
-    # =========================================================
-
     ciclo = registrar_ciclo(
-        objetivo=objetivo,
-        localizacao=localizacao,
-        pesquisa=decisao_ia.get(
-            "fontes_utilizadas"
-        ),
-        analise=decisao_ia,
-        decisao=decisao,
-        execucao=execucao,
-        medicao=medicao
+        objetivo=objetivo, localizacao=localizacao,
+        pesquisa=decisao_ia.get("fontes_utilizadas"),
+        analise=decisao_ia, decisao=decisao,
+        execucao=execucao, medicao=medicao
     )
-
-    # =========================================================
-    # 11. RETORNO
-    # =========================================================
 
     return {
         "status": "sucesso",
@@ -274,14 +158,13 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
         "memoria_utilizada": memoria,
         "decisao_ia": decisao_ia,
         "decisao": decisao,
+        "tarefas": tarefas,
         "execucao": execucao,
         "medicao": medicao,
         "ciclo_memoria": ciclo
     }
-class MoneyAgent:
 
+
+class MoneyAgent:
     def executar_ciclo(self, objetivo, localizacao="Brasil"):
-        return executar_ciclo(
-            objetivo,
-            localizacao
-        )
+        return executar_ciclo(objetivo, localizacao)
