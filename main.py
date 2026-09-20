@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template_string
 
 from ai import analisar_oportunidade
 from agent import executar_ciclo
+from memory import obter_acoes_externas, atualizar_acao_externa
 
 
 app = Flask(__name__)
@@ -61,6 +62,11 @@ HTML = """
     </button>
 
     <div id="resultado"></div>
+    <hr>
+    <h2>Ações externas pendentes</h2>
+    <p>Estas ações foram preparadas pela Evolia e aguardam sua autorização.</p>
+    <div id="statusAcao"></div>
+    <div id="acoes"></div>
 
     <script>
         async function executarCiclo() {
@@ -97,6 +103,30 @@ HTML = """
                 resultado.textContent = "Erro: " + erro;
             }
         }
+        async function carregarAcoes() {
+            const resultado = document.getElementById("acoes");
+            const resposta = await fetch("/acoes-pendentes");
+            const dados = await resposta.json();
+            if (!dados.acoes || dados.acoes.length === 0) {
+                resultado.innerHTML = "<p>Nenhuma ação aguardando autorização.</p>";
+                return;
+            }
+            resultado.innerHTML = dados.acoes.map(acao =>
+                "<div style='border:1px solid #ccc;padding:15px;margin:12px 0;border-radius:8px'>" +
+                "<b>Alvo:</b> " + (acao.alvo || "-") + "<br>" +
+                "<b>Canal:</b> " + (acao.canal || "-") +
+                "<p><b>Mensagem:</b></p><pre style='white-space:pre-wrap'>" + (acao.mensagem || "") + "</pre>" +
+                "<button onclick=" + JSON.stringify("decidirAcao('" + acao.id + "','autorizar')") + ">Autorizar</button> " +
+                "<button onclick=" + JSON.stringify("decidirAcao('" + acao.id + "','recusar')") + ">Recusar</button></div>"
+            ).join("");
+        }
+        async function decidirAcao(id, decisao) {
+            const resposta = await fetch("/acoes/" + encodeURIComponent(id) + "/" + decisao, {method:"POST"});
+            const dados = await resposta.json();
+            document.getElementById("statusAcao").textContent = dados.mensagem || JSON.stringify(dados);
+            carregarAcoes();
+        }
+        carregarAcoes();
     </script>
 </body>
 </html>
@@ -114,6 +144,25 @@ def health():
         "status": "online",
         "nome": "Evolia AI"
     })
+
+
+@app.route("/acoes-pendentes")
+def acoes_pendentes():
+    return jsonify({"acoes": obter_acoes_externas(status="aguardando_autorizacao", limite=20)})
+
+
+@app.route("/acoes/<acao_id>/<decisao>", methods=["POST"])
+def decidir_acao(acao_id, decisao):
+    if decisao not in {"autorizar", "recusar"}:
+        return jsonify({"erro": "Decisão inválida."}), 400
+    acao = next((x for x in obter_acoes_externas(limite=100) if x.get("id") == acao_id), None)
+    if not acao:
+        return jsonify({"erro": "Ação não encontrada."}), 404
+    if acao.get("status") != "aguardando_autorizacao":
+        return jsonify({"erro": "Esta ação já foi processada."}), 409
+    novo_status = "autorizada" if decisao == "autorizar" else "cancelada"
+    atualizar_acao_externa(acao_id, novo_status, {"origem": "interface_usuario"})
+    return jsonify({"status": novo_status, "mensagem": "Ação autorizada e registrada." if decisao == "autorizar" else "Ação recusada e cancelada."})
 
 
 @app.route("/ciclo", methods=["POST"])
