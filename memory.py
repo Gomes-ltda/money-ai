@@ -324,9 +324,30 @@ def validar_venda_para_cobranca(acao_id):
             venda = next((x for x in reversed(feedbacks) if bool(x.get("venda"))), None)
             if not venda:
                 return {"ok": False, "motivo": "A venda ainda não foi confirmada para esta ação."}
-            return {"ok": True, "acao": acao, "feedback": venda}
+            return {
+                "ok": True,
+                "acao": acao,
+                "feedback": venda,
+                "venda_id": f"{acao_id}:venda"
+            }
     return {"ok": False, "motivo": "Ação externa não encontrada."}
 
+
+
+def obter_pagamento_por_id(pagamento_id):
+    memoria = carregar_memoria()
+    for pagamento in reversed(memoria["pagamentos"]):
+        if pagamento.get("id") == pagamento_id:
+            return pagamento
+    return None
+
+
+def obter_pagamento_por_referencia(referencia):
+    memoria = carregar_memoria()
+    for pagamento in reversed(memoria["pagamentos"]):
+        if pagamento.get("referencia") == referencia:
+            return pagamento
+    return None
 
 
 def registrar_pagamento(pagamento):
