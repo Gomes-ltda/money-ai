@@ -87,22 +87,48 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
         executor = Executor()
         execucoes = []
 
+        contexto_execucao = {
+            "objetivo": objetivo,
+            "localizacao": localizacao,
+            "resultado_anterior": None,
+            "historico": []
+        }
+
         for tarefa in tarefas[:MAX_TAREFAS_POR_CICLO]:
             tarefa_decisao = dict(decisao)
             tarefa_decisao["acao"] = tarefa["acao"]
+            tarefa_decisao["resultado_anterior"] = contexto_execucao["resultado_anterior"]
+            tarefa_decisao["contexto_execucao"] = contexto_execucao
 
             try:
                 resultado_tarefa = executor.executar(tarefa_decisao)
                 if resultado_tarefa.get("status") in {"erro", "bloqueado"}:
                     gerenciador.falhar(tarefa, resultado_tarefa)
                     execucoes.append(resultado_tarefa)
+                    contexto_execucao["historico"].append({
+                        "tarefa_id": tarefa["id"],
+                        "acao": tarefa["acao"],
+                        "resultado": resultado_tarefa
+                    })
                     break
 
                 gerenciador.concluir(tarefa, resultado_tarefa)
                 execucoes.append(resultado_tarefa)
+                contexto_execucao["resultado_anterior"] = resultado_tarefa
+                contexto_execucao["historico"].append({
+                    "tarefa_id": tarefa["id"],
+                    "acao": tarefa["acao"],
+                    "resultado": resultado_tarefa
+                })
             except Exception as erro:
-                gerenciador.falhar(tarefa, {"erro": str(erro)})
-                execucoes.append({"status": "erro", "acao": tarefa["acao"], "erro": str(erro)})
+                erro_resultado = {"status": "erro", "acao": tarefa["acao"], "erro": str(erro)}
+                gerenciador.falhar(tarefa, erro_resultado)
+                execucoes.append(erro_resultado)
+                contexto_execucao["historico"].append({
+                    "tarefa_id": tarefa["id"],
+                    "acao": tarefa["acao"],
+                    "resultado": erro_resultado
+                })
                 break
 
         execucao = {

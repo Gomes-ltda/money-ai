@@ -67,18 +67,23 @@ class Executor:
         return {"status": "executado", "acao": "pesquisar", "consulta": consulta, "resultado": resultado}
 
     def executar_analise(self, decisao):
+        anterior = decisao.get("resultado_anterior") or {}
+        pesquisa_anterior = anterior.get("resultado", {}) if isinstance(anterior, dict) else {}
         analise = {
             "estrategia": decisao.get("estrategia"),
             "nicho": decisao.get("nicho"),
             "cliente_alvo": decisao.get("cliente_alvo"),
             "problema": decisao.get("problema"),
             "oferta": decisao.get("oferta"),
-            "canal": decisao.get("canal")
+            "canal": decisao.get("canal"),
+            "pesquisa_anterior": pesquisa_anterior
         }
         registrar_evento("analise", f"Análise estruturada para a estratégia: {decisao.get('estrategia')}")
         return {"status": "executado", "acao": "analisar", "resultado": {"receita": 0, "custo": 0, "analise": analise}}
 
     def criar_oferta(self, decisao):
+        anterior = decisao.get("resultado_anterior") or {}
+        analise_anterior = anterior.get("resultado", {}).get("analise") if isinstance(anterior, dict) else None
         oferta = {
             "estrategia": decisao.get("estrategia"),
             "nicho": decisao.get("nicho"),
@@ -87,14 +92,19 @@ class Executor:
             "oferta": decisao.get("oferta"),
             "canal": decisao.get("canal"),
             "preco_teste": decisao.get("preco_teste"),
-            "custo_teste": decisao.get("custo_teste", 0)
+            "custo_teste": decisao.get("custo_teste", 0),
+            "analise_anterior": analise_anterior
         }
         registrar_evento("oferta_criada", f"Oferta estruturada: {decisao.get('oferta')}")
         return {"status": "executado", "acao": "criar_oferta", "resultado": {"receita": 0, "custo": 0, "oferta": oferta}}
 
     def criar_proposta(self, decisao):
+        anterior = decisao.get("resultado_anterior") or {}
+        oferta_anterior = anterior.get("resultado", {}).get("oferta") if isinstance(anterior, dict) else None
         cliente = decisao.get("cliente_alvo", "cliente potencial")
         oferta = decisao.get("oferta", "serviço")
+        if isinstance(oferta_anterior, dict):
+            oferta = oferta_anterior.get("oferta") or oferta
         problema = decisao.get("problema", "uma necessidade do cliente")
         preco = decisao.get("preco_teste")
         proposta = f"Olá! Identifiquei que {cliente} pode estar enfrentando {problema}. Posso oferecer {oferta} "
@@ -119,6 +129,8 @@ class Executor:
         return {"status": "executado", "acao": "criar_conteudo", "resultado": {"receita": 0, "custo": 0, "conteudo": conteudo}}
 
     def testar_estrategia(self, decisao):
+        anterior = decisao.get("resultado_anterior") or {}
+        proposta_anterior = anterior.get("resultado", {}).get("proposta") if isinstance(anterior, dict) else None
         estrategia = decisao.get("estrategia", "estratégia sem nome")
         plano = {
             "objetivo": decisao.get("objetivo"),
@@ -128,7 +140,8 @@ class Executor:
             "canal": decisao.get("canal"),
             "preco_teste": decisao.get("preco_teste"),
             "custo_teste": decisao.get("custo_teste", 0),
-            "acao_imediata": decisao.get("acao_imediata")
+            "acao_imediata": decisao.get("acao_imediata"),
+            "proposta_anterior": proposta_anterior
         }
         restricoes = {
             "receita_real": False,
