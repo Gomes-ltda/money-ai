@@ -14,6 +14,7 @@ PERMISSOES_PADRAO = {
     "criar_proposta": True,
     "criar_conteudo": True,
     "preparar_abordagem": True,
+    "pesquisar_alvo": True,
     "testar_estrategia": True,
     "registrar_resultado": True,
     "criar_tarefa": True,
