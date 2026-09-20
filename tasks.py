@@ -15,6 +15,15 @@ ACOES_INTERNAS = {
 }
 
 
+CADEIA_PROCESSO = [
+    ("pesquisar", "Pesquisar dados para validar a oportunidade."),
+    ("analisar", "Estruturar os dados encontrados."),
+    ("criar_oferta", "Montar a oferta inicial a partir da análise."),
+    ("criar_proposta", "Preparar a proposta comercial a partir da oferta."),
+    ("preparar_abordagem", "Preparar a abordagem externa para autorização do usuário.")
+]
+
+
 def criar_tarefas(decisao):
     acao = decisao.get("acao")
     tarefas = []
@@ -28,18 +37,13 @@ def criar_tarefas(decisao):
                 "status": "pendente"
             })
 
-    if acao == "pesquisar":
-        adicionar("pesquisar", "Pesquisar dados para validar a oportunidade.")
-        adicionar("analisar", "Estruturar os dados encontrados.")
-    elif acao == "analisar":
-        adicionar("analisar", "Estruturar a oportunidade e seus dados.")
-        adicionar("criar_oferta", "Montar a oferta inicial a partir da análise.")
-    elif acao == "criar_oferta":
-        adicionar("criar_oferta", "Montar a oferta inicial.")
-        adicionar("criar_proposta", "Preparar a proposta comercial a partir da oferta.")
-    elif acao == "criar_proposta":
-        adicionar("criar_proposta", "Preparar a proposta comercial.")
-        adicionar("preparar_abordagem", "Preparar a abordagem externa para autorização do usuário.")
+    if acao in {"pesquisar", "analisar", "criar_oferta", "criar_proposta"}:
+        indice = next(
+            indice for indice, (acao_tarefa, _) in enumerate(CADEIA_PROCESSO)
+            if acao_tarefa == acao
+        )
+        for acao_tarefa, descricao in CADEIA_PROCESSO[indice:]:
+            adicionar(acao_tarefa, descricao)
     elif acao == "criar_conteudo":
         adicionar("criar_conteudo", "Produzir o material de teste.")
     elif acao == "preparar_abordagem":
