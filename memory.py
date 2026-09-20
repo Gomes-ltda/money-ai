@@ -2,8 +2,14 @@ import json
 import os
 from datetime import datetime, timezone
 
+try:
+    import psycopg
+except ImportError:
+    psycopg = None
+
 
 ARQUIVO_MEMORIA = "memory.json"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 
 def memoria_padrao():
@@ -31,78 +37,151 @@ def garantir_estrutura(memoria):
         if chave not in memoria:
             memoria[chave] = valor
 
-    if not isinstance(
-        memoria.get("financeiro"),
-        dict
-    ):
+    if not isinstance(memoria.get("financeiro"), dict):
         memoria["financeiro"] = {
             "receita": 0,
             "custos": 0
         }
 
-    memoria["financeiro"].setdefault(
-        "receita",
-        0
-    )
-
-    memoria["financeiro"].setdefault(
-        "custos",
-        0
-    )
+    memoria["financeiro"].setdefault("receita", 0)
+    memoria["financeiro"].setdefault("custos", 0)
 
     return memoria
 
 
 def agora():
-    return datetime.now(
-        timezone.utc
-    ).isoformat()
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _usar_banco():
+    return bool(DATABASE_URL and psycopg)
+
+
+def _conectar():
+    return psycopg.connect(
+        DATABASE_URL,
+        connect_timeout=10
+    )
+
+
+def _inicializar_banco():
+    if not _usar_banco():
+        return False
+
+    try:
+        with _conectar() as conexao:
+            with conexao.cursor() as cursor:
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS evolia_memory (
+                        id INTEGER PRIMARY KEY,
+                        data JSONB NOT NULL,
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+        return True
+    except Exception:
+        return False
+
+
+def _carregar_banco():
+    if not _inicializar_banco():
+        return None
+
+    try:
+        with _conectar() as conexao:
+            with conexao.cursor() as cursor:
+                cursor.execute(
+                    "SELECT data FROM evolia_memory WHERE id = 1"
+                )
+                linha = cursor.fetchone()
+
+        if linha:
+            return garantir_estrutura(linha[0])
+
+        # Migra a memória JSON existente apenas na primeira inicialização.
+        if os.path.exists(ARQUIVO_MEMORIA):
+            try:
+                with open(
+                    ARQUIVO_MEMORIA,
+                    "r",
+                    encoding="utf-8"
+                ) as arquivo:
+                    memoria = garantir_estrutura(json.load(arquivo))
+            except Exception:
+                memoria = memoria_padrao()
+        else:
+            memoria = memoria_padrao()
+
+        _salvar_banco(memoria)
+        return memoria
+
+    except Exception:
+        return None
+
+
+def _salvar_banco(memoria):
+    if not _inicializar_banco():
+        return False
+
+    try:
+        memoria = garantir_estrutura(memoria)
+
+        with _conectar() as conexao:
+            with conexao.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO evolia_memory (id, data, updated_at)
+                    VALUES (1, %s, NOW())
+                    ON CONFLICT (id)
+                    DO UPDATE SET
+                        data = EXCLUDED.data,
+                        updated_at = NOW()
+                    """,
+                    (json.dumps(memoria, ensure_ascii=False),)
+                )
+        return True
+    except Exception:
+        return False
 
 
 def carregar_memoria():
+    memoria_banco = _carregar_banco()
 
-    if not os.path.exists(
-        ARQUIVO_MEMORIA
-    ):
+    if memoria_banco is not None:
+        return memoria_banco
+
+    if not os.path.exists(ARQUIVO_MEMORIA):
         memoria = memoria_padrao()
         salvar_memoria(memoria)
         return memoria
 
     try:
-
         with open(
             ARQUIVO_MEMORIA,
             "r",
             encoding="utf-8"
         ) as arquivo:
+            memoria = json.load(arquivo)
 
-            memoria = json.load(
-                arquivo
-            )
-
-        memoria = garantir_estrutura(
-            memoria
-        )
-
-        return memoria
+        return garantir_estrutura(memoria)
 
     except Exception:
-
         return memoria_padrao()
 
 
 def salvar_memoria(memoria):
+    memoria = garantir_estrutura(memoria)
 
-    memoria = garantir_estrutura(
-        memoria
-    )
+    if _usar_banco() and _salvar_banco(memoria):
+        return
 
     with open(
         ARQUIVO_MEMORIA,
         "w",
         encoding="utf-8"
     ) as arquivo:
-
         json.dump(
             memoria,
             arquivo,
@@ -115,11 +194,7 @@ def salvar_memoria(memoria):
 # EVENTOS
 # =========================================================
 
-def registrar_evento(
-    tipo,
-    descricao
-):
-
+def registrar_evento(tipo, descricao):
     memoria = carregar_memoria()
 
     evento = {
@@ -128,10 +203,7 @@ def registrar_evento(
         "descricao": descricao
     }
 
-    memoria["eventos"].append(
-        evento
-    )
-
+    memoria["eventos"].append(evento)
     salvar_memoria(memoria)
 
     return evento
@@ -149,7 +221,6 @@ def registrar_resultado(
     acao=None,
     evidencias=None
 ):
-
     memoria = carregar_memoria()
 
     if resultado is None:
@@ -165,17 +236,9 @@ def registrar_resultado(
         "evidencias": evidencias or []
     }
 
-    memoria["resultados"].append(
-        registro
-    )
-
-    memoria["financeiro"]["receita"] += (
-        receita
-    )
-
-    memoria["financeiro"]["custos"] += (
-        custo
-    )
+    memoria["resultados"].append(registro)
+    memoria["financeiro"]["receita"] += receita
+    memoria["financeiro"]["custos"] += custo
 
     salvar_memoria(memoria)
 
@@ -186,12 +249,7 @@ def registrar_resultado(
 # ESTRATÉGIAS
 # =========================================================
 
-def registrar_estrategia(
-    nome,
-    descricao,
-    status="em_teste"
-):
-
+def registrar_estrategia(nome, descricao, status="em_teste"):
     memoria = carregar_memoria()
 
     estrategia = {
@@ -201,10 +259,7 @@ def registrar_estrategia(
         "status": status
     }
 
-    memoria["estrategias"].append(
-        estrategia
-    )
-
+    memoria["estrategias"].append(estrategia)
     salvar_memoria(memoria)
 
     return estrategia
@@ -223,7 +278,6 @@ def registrar_ciclo(
     execucao=None,
     medicao=None
 ):
-
     memoria = carregar_memoria()
 
     ciclo = {
@@ -237,10 +291,7 @@ def registrar_ciclo(
         "medicao": medicao
     }
 
-    memoria["ciclos"].append(
-        ciclo
-    )
-
+    memoria["ciclos"].append(ciclo)
     salvar_memoria(memoria)
 
     return ciclo
@@ -261,7 +312,6 @@ def registrar_teste(
     status="em_andamento",
     ciclo=None
 ):
-
     memoria = carregar_memoria()
 
     if resultado is None:
@@ -282,10 +332,7 @@ def registrar_teste(
         "status": status
     }
 
-    memoria["testes"].append(
-        teste
-    )
-
+    memoria["testes"].append(teste)
     salvar_memoria(memoria)
 
     return teste
@@ -304,7 +351,6 @@ def registrar_aprendizado(
     confianca=None,
     recomendacao=None
 ):
-
     memoria = carregar_memoria()
 
     registro = {
@@ -318,10 +364,7 @@ def registrar_aprendizado(
         "recomendacao": recomendacao
     }
 
-    memoria["aprendizados"].append(
-        registro
-    )
-
+    memoria["aprendizados"].append(registro)
     salvar_memoria(memoria)
 
     return registro
@@ -331,34 +374,25 @@ def registrar_aprendizado(
 # HISTÓRICO DE UMA ESTRATÉGIA
 # =========================================================
 
-def obter_historico_estrategia(
-    estrategia
-):
-
+def obter_historico_estrategia(estrategia):
     memoria = carregar_memoria()
 
     resultados = [
         registro
         for registro in memoria["resultados"]
-        if registro.get(
-            "estrategia"
-        ) == estrategia
+        if registro.get("estrategia") == estrategia
     ]
 
     testes = [
         teste
         for teste in memoria["testes"]
-        if teste.get(
-            "estrategia"
-        ) == estrategia
+        if teste.get("estrategia") == estrategia
     ]
 
     aprendizados = [
         aprendizado
         for aprendizado in memoria["aprendizados"]
-        if aprendizado.get(
-            "estrategia"
-        ) == estrategia
+        if aprendizado.get("estrategia") == estrategia
     ]
 
     return {
@@ -373,17 +407,9 @@ def obter_historico_estrategia(
 # ÚLTIMOS APRENDIZADOS
 # =========================================================
 
-def obter_ultimos_aprendizados(
-    limite=10
-):
-
+def obter_ultimos_aprendizados(limite=10):
     memoria = carregar_memoria()
-
-    aprendizados = memoria[
-        "aprendizados"
-    ]
-
-    return aprendizados[-limite:]
+    return memoria["aprendizados"][-limite:]
 
 
 # =========================================================
@@ -391,39 +417,20 @@ def obter_ultimos_aprendizados(
 # =========================================================
 
 def obter_resumo():
-
     memoria = carregar_memoria()
 
-    receita = memoria[
-        "financeiro"
-    ]["receita"]
-
-    custos = memoria[
-        "financeiro"
-    ]["custos"]
-
+    receita = memoria["financeiro"]["receita"]
+    custos = memoria["financeiro"]["custos"]
     lucro = receita - custos
 
     return {
         "receita_total": receita,
         "custos_total": custos,
         "resultado_total": lucro,
-        "eventos": len(
-            memoria["eventos"]
-        ),
-        "estrategias": len(
-            memoria["estrategias"]
-        ),
-        "resultados": len(
-            memoria["resultados"]
-        ),
-        "ciclos": len(
-            memoria["ciclos"]
-        ),
-        "testes": len(
-            memoria["testes"]
-        ),
-        "aprendizados": len(
-            memoria["aprendizados"]
-        )
+        "eventos": len(memoria["eventos"]),
+        "estrategias": len(memoria["estrategias"]),
+        "resultados": len(memoria["resultados"]),
+        "ciclos": len(memoria["ciclos"]),
+        "testes": len(memoria["testes"]),
+        "aprendizados": len(memoria["aprendizados"])
     }
