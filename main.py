@@ -189,7 +189,14 @@ def health():
 def acoes_pendentes():
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
-    return jsonify({"acoes": obter_acoes_externas(status="aguardando_autorizacao", limite=20)})
+    acoes = obter_acoes_externas(status="aguardando_autorizacao", limite=50)
+    validas = [
+        acao for acao in acoes
+        if (acao.get("alvo") or "").strip()
+        and (acao.get("mensagem") or "").strip()
+        and ((acao.get("contexto") or {}).get("url_alvo") or "").startswith(("https://", "http://"))
+    ]
+    return jsonify({"acoes": validas[:20]})
 
 
 @app.route("/acoes/<acao_id>/<decisao>", methods=["POST"])
