@@ -296,6 +296,8 @@ def feedback_acao(acao_id):
     feedback = registrar_feedback_acao_externa(acao_id, resposta=str(dados.get("resposta", "")).strip() or None, interesse=str(interesse).strip() if interesse is not None else None, venda=venda, receita=receita, custo=custo, observacao=str(dados.get("observacao", "")).strip() or None)
     if feedback is None:
         return jsonify({"erro": "Ação externa não encontrada."}), 404
+    if isinstance(feedback, dict) and feedback.get("erro"):
+        return jsonify(feedback), 409
     return jsonify({"status": "registrado", "feedback": feedback})
 
 
