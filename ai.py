@@ -77,16 +77,15 @@ def analisar_oportunidade(
     contexto_memoria=None
 ):
 
-    if AI_PROVIDER not in {"auto", "gemini", "openai"}:
-        AI_PROVIDER = "auto"
+    provider = AI_PROVIDER if AI_PROVIDER in {"auto", "gemini", "openai"} else "auto"
 
-    if AI_PROVIDER == "gemini" and not GEMINI_API_KEY:
+    if provider == "gemini" and not GEMINI_API_KEY:
         return {"status": "erro_configuracao", "erro": "AI_PROVIDER=gemini, mas GEMINI_API_KEY não está configurada.", "objetivo": objetivo, "localizacao": localizacao}
 
-    if AI_PROVIDER == "openai" and not OPENAI_API_KEY:
+    if provider == "openai" and not OPENAI_API_KEY:
         return {"status": "erro_configuracao", "erro": "AI_PROVIDER=openai, mas OPENAI_API_KEY não está configurada.", "objetivo": objetivo, "localizacao": localizacao}
 
-    if AI_PROVIDER == "auto" and not GEMINI_API_KEY and not OPENAI_API_KEY:
+    if provider == "auto" and not GEMINI_API_KEY and not OPENAI_API_KEY:
         return {
             "status": "erro_configuracao",
             "erro": "Nenhum provedor de IA configurado. Configure GEMINI_API_KEY ou OPENAI_API_KEY.",
@@ -294,11 +293,11 @@ FORMATO:
         modelo_usado = None
         erro = None
 
-        if AI_PROVIDER in {"auto", "gemini"} and GEMINI_API_KEY:
+        if provider in {"auto", "gemini"} and GEMINI_API_KEY:
             cliente = genai.Client(api_key=GEMINI_API_KEY)
             dados, modelo_usado, erro = _gerar_json(cliente, prompt)
 
-        if dados is None and AI_PROVIDER in {"auto", "openai"}:
+        if dados is None and provider in {"auto", "openai"}:
             dados_openai, modelo_openai, erro_openai = _gerar_openai(prompt)
             if dados_openai is not None:
                 dados = dados_openai
@@ -312,7 +311,7 @@ FORMATO:
                     "erro_openai": erro_openai,
                     "modelos_tentados": MODELOS,
                     "openai_configurado": bool(OPENAI_API_KEY),
-                    "ai_provider": AI_PROVIDER,
+                    "ai_provider": provider,
                     "objetivo": objetivo,
                     "localizacao": localizacao
                 }
