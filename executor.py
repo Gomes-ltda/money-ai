@@ -208,18 +208,25 @@ class Executor:
         proposta_anterior = None
         if isinstance(anterior, dict):
             proposta_anterior = anterior.get("resultado", {}).get("proposta")
-        cliente = decisao.get("cliente_alvo", "cliente potencial")
+        cliente = decisao.get("cliente_alvo") or "cliente potencial"
         canal = decisao.get("canal", "canal não definido")
         url_alvo = (decisao.get("url_alvo") or "").strip()
+        alvo_encontrado = None
         if isinstance(anterior, dict):
             resultado_anterior = anterior.get("resultado", {})
             if isinstance(resultado_anterior, dict):
                 canal = resultado_anterior.get("canal") or canal
                 url_alvo = (resultado_anterior.get("url_alvo") or url_alvo).strip()
+                alvo_encontrado = resultado_anterior.get("alvo_encontrado") or {}
+                cliente = alvo_encontrado.get("titulo") or cliente
         if canal not in {"instagram", "linkedin", "whatsapp", "email"}:
             return {"status": "bloqueado", "acao": "preparar_abordagem", "motivo": "Canal externo não suportado ou não definido."}
         if not url_alvo.startswith(("https://", "http://")):
             return {"status": "bloqueado", "acao": "preparar_abordagem", "motivo": "URL pública específica do alvo não foi definida."}
+        problema = (decisao.get("problema") or "").strip()
+        oferta = (decisao.get("oferta") or "").strip()
+        if not problema or not oferta or cliente == "cliente potencial":
+            return {"status": "bloqueado", "acao": "preparar_abordagem", "motivo": "A oportunidade ainda não possui problema, oferta e alvo suficientemente definidos para uma abordagem."}
         mensagem = proposta_anterior or decisao.get("proposta") or (
             f"Olá! Vi seu trabalho e identifiquei uma oportunidade relacionada a {decisao.get('problema', 'uma necessidade do seu negócio')}. "
             f"Tenho uma proposta de teste pequeno para {decisao.get('oferta', 'uma solução específica')}. "
