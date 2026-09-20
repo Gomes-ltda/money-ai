@@ -173,6 +173,10 @@ def processar_webhook(payload, data_id):
             status_order == "processed"
             or status_pagamento in {"approved", "processed"}
         )
+        falhou = (
+            status_order in {"canceled", "cancelled", "rejected", "failed", "expired"}
+            or status_pagamento in {"rejected", "cancelled", "canceled", "refunded", "charged_back"}
+        )
 
         if confirmado:
             atualizar_pagamento(
@@ -182,15 +186,31 @@ def processar_webhook(payload, data_id):
                 status_detail=status_detail
             )
 
-            if not existente.get("receita_registrada"):
+            # Recarrega o registro após a atualização para manter o webhook idempotente.
+            atual = next(
+                (x for x in obter_pagamentos() if str(x.get("id")) == pagamento_id),
+                existente
+            )
+            if not atual.get("receita_registrada"):
                 registrar_resultado(
-                    estrategia=existente.get("estrategia") or "venda via pagamento",
-                    receita=float(existente.get("valor", 0) or 0),
+                    estrategia=atual.get("estrategia") or "venda via pagamento",
+                    receita=float(atual.get("valor", 0) or 0),
                     custo=0,
-                    resultado=float(existente.get("valor", 0) or 0),
+                    resultado=float(atual.get("valor", 0) or 0),
                     acao="pagamento_confirmado",
                     evidencias=[{"pagamento_id": pagamento_id, "evento": payload, "order": order}]
                 )
                 atualizar_pagamento(pagamento_id, receita_registrada=True)
+        elif falhou:
+            atualizar_pagamento(
+                pagamento_id,
+                status="falhou",
+                status_provedor=status_order or status_pagamento,
+                status_detail=status_detail
+            )
 
-    return {"status": "processado", "pagamento": atualizado or existente}
+    final = next(
+        (x for x in obter_pagamentos() if str(x.get("id")) == pagamento_id),
+        existente
+    )
+    return {"status": "processado", "pagamento": final}
