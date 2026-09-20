@@ -276,3 +276,10 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
         "medicao": medicao,
         "ciclo_memoria": ciclo
     }
+class MoneyAgent:
+
+    def executar_ciclo(self, objetivo, localizacao="Brasil"):
+        return executar_ciclo(
+            objetivo,
+            localizacao
+        )
