@@ -39,6 +39,11 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None, acao_id=No
         return {"status": "erro", "erro": "A referência deve ter no máximo 64 caracteres."}
     existente = next((x for x in obter_pagamentos() if x.get("referencia") == referencia), None)
     if existente:
+        if acao_id and existente.get("acao_id") and existente.get("acao_id") != acao_id:
+            return {"status": "erro", "erro": "A referência já está vinculada a outra ação comercial."}
+        if acao_id and not existente.get("acao_id"):
+            atualizar_pagamento(existente.get("id"), acao_id=acao_id)
+            existente = next((x for x in obter_pagamentos() if x.get("id") == existente.get("id")), existente)
         return {"status": "ja_existente", "pagamento": existente}
 
     payload = {
