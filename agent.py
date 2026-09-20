@@ -86,10 +86,18 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
         tarefas = gerenciador.criar(decisao)
         executor = Executor()
         execucoes = []
+        contexto_execucao = {
+            "objetivo": objetivo,
+            "localizacao": localizacao,
+            "resultados_anteriores": []
+        }
 
         for tarefa in tarefas[:MAX_TAREFAS_POR_CICLO]:
             tarefa_decisao = dict(decisao)
             tarefa_decisao["acao"] = tarefa["acao"]
+            tarefa_decisao["contexto_execucao"] = contexto_execucao
+            if contexto_execucao["resultados_anteriores"]:
+                tarefa_decisao["resultado_anterior"] = contexto_execucao["resultados_anteriores"][-1]
 
             try:
                 resultado_tarefa = executor.executar(tarefa_decisao)
@@ -100,6 +108,10 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
 
                 gerenciador.concluir(tarefa, resultado_tarefa)
                 execucoes.append(resultado_tarefa)
+                contexto_execucao["resultados_anteriores"].append({
+                    "acao": tarefa["acao"],
+                    "resultado": resultado_tarefa
+                })
             except Exception as erro:
                 gerenciador.falhar(tarefa, {"erro": str(erro)})
                 execucoes.append({"status": "erro", "acao": tarefa["acao"], "erro": str(erro)})
