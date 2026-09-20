@@ -5,6 +5,8 @@ from ai import analisar_oportunidade
 from agent import executar_ciclo
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
+from pagamentos import criar_cobranca_pix, validar_webhook, processar_webhook
+from memory import obter_pagamentos
 
 
 app = Flask(__name__)
@@ -306,6 +308,50 @@ def status_acao(acao_id):
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     return jsonify(consultar_acao_externa(acao_id))
+
+
+@app.route("/pagamentos", methods=["GET"])
+def listar_pagamentos():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    return jsonify({"pagamentos": obter_pagamentos()})
+
+
+@app.route("/pagamentos/pix", methods=["POST"])
+def criar_pagamento_pix():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+
+    dados = request.get_json(silent=True) or {}
+    try:
+        valor = float(dados.get("valor", 0) or 0)
+    except (TypeError, ValueError):
+        return jsonify({"erro": "Valor inválido."}), 400
+
+    if valor <= 0:
+        return jsonify({"erro": "O valor deve ser maior que zero."}), 400
+
+    resultado = criar_cobranca_pix(
+        valor=valor,
+        descricao=str(dados.get("descricao", "Serviço Evolia")).strip() or "Serviço Evolia",
+        referencia=str(dados.get("referencia", "")).strip() or None,
+        email=str(dados.get("email", "")).strip() or None
+    )
+    if resultado.get("status") == "criado":
+        pagamento = resultado.get("pagamento") or {}
+        pagamento["estrategia"] = str(dados.get("estrategia", "")).strip() or None
+    return jsonify(resultado), (200 if resultado.get("status") == "criado" else 400)
+
+
+@app.route("/pagamentos/webhook", methods=["POST"])
+def pagamentos_webhook():
+    dados = request.get_json(silent=True) or {}
+    data_id = request.args.get("data.id") or ((dados.get("data") or {}).get("id"))
+    if not validar_webhook(request.headers, data_id):
+        return jsonify({"erro": "Assinatura do webhook inválida."}), 401
+
+    resultado = processar_webhook(dados, data_id)
+    return jsonify(resultado), 200
 
 
 @app.route("/ciclo", methods=["POST"])
