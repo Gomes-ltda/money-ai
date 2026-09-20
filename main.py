@@ -6,7 +6,7 @@ from agent import executar_ciclo
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
 from pagamentos import criar_cobranca_pix, validar_webhook, processar_webhook
-from memory import obter_pagamentos, atualizar_pagamento
+from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca
 
 
 app = Flask(__name__)
@@ -335,11 +335,21 @@ def criar_pagamento_pix():
     if not email:
         return jsonify({"erro": "Informe o e-mail do comprador para gerar a cobrança Pix."}), 400
 
+    acao_id = str(dados.get("acao_id", "")).strip()
+    if not acao_id:
+        return jsonify({"erro": "Informe a ação comercial que originou esta cobrança."}), 400
+
+    venda = validar_venda_para_cobranca(acao_id)
+    if not venda.get("ok"):
+        return jsonify({"erro": venda.get("motivo", "Venda não confirmada.")}), 409
+
+    referencia = str(dados.get("referencia", "")).strip() or ("venda-" + acao_id[:32])
+
     resultado = criar_cobranca_pix(
         valor=valor,
         descricao=str(dados.get("descricao", "Serviço Evolia")).strip() or "Serviço Evolia",
-        referencia=str(dados.get("referencia", "")).strip() or None,
-        email=str(dados.get("email", "")).strip() or None
+        referencia=referencia,
+        email=email
     )
     if resultado.get("status") == "criado":
         pagamento = resultado.get("pagamento") or {}
