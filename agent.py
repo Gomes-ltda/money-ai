@@ -6,7 +6,8 @@ from memory import (
     registrar_ciclo,
     registrar_resultado,
     registrar_aprendizado,
-    obter_ultimos_aprendizados
+    obter_ultimos_aprendizados,
+    obter_contexto_estrategico
 )
 
 ACOES_PERMITIDAS = {
@@ -38,9 +39,10 @@ def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
 
 def executar_ciclo(objetivo, localizacao="Brasil"):
     memoria = obter_ultimos_aprendizados(10)
+    contexto_estrategico = obter_contexto_estrategico()
 
     decisao_ia = analisar_oportunidade(
-        objetivo, localizacao, contexto_memoria=memoria
+        objetivo, localizacao, contexto_memoria=memoria + [{"tipo": "desempenho_estrategico", "dados": contexto_estrategico}]
     )
 
     if decisao_ia.get("status") in {"erro_cota", "erro", "erro_configuracao"}:
