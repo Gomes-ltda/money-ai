@@ -208,7 +208,8 @@ Você deve:
 9. escolher um canal;
 10. definir a próxima ação executável;
 11. decidir qual ação o Executor deve realizar;
-12. registrar o que deverá ser aprendido com o teste.
+12. quando escolher "preparar_abordagem", identificar uma URL pública e específica do alvo no campo "url_alvo";
+13. registrar o que deverá ser aprendido com o teste.
 
 REGRA IMPORTANTE:
 
@@ -299,6 +300,7 @@ FORMATO:
         "problema": "...",
         "oferta": "...",
         "canal": "...",
+        "url_alvo": "...",
         "preco_teste": 0,
         "custo_teste": 0,
         "acao_imediata": "...",
