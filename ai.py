@@ -1,193 +1,183 @@
 import json
+import os
 import time
 
 from google import genai
+
 from pesquisa import pesquisar_varias
 from memory import obter_ultimos_aprendizados
 
 
-client = genai.Client()
+GEMINI_API_KEY = os.getenv(
+    "GEMINI_API_KEY"
+)
+
+MODELO = "gemini-3.6-flash"
 
 
 def analisar_oportunidade(
     objetivo,
-    localizacao,
+    localizacao="Brasil",
     contexto_memoria=None
 ):
 
-    # --------------------------------------------------
-    # 1. CARREGAR MEMÓRIA
-    # --------------------------------------------------
+    if not GEMINI_API_KEY:
+        return {
+            "status": "erro_configuracao",
+            "erro": "GEMINI_API_KEY não configurada.",
+            "objetivo": objetivo,
+            "localizacao": localizacao
+        }
+
+    # =========================================================
+    # 1. MEMÓRIA
+    # =========================================================
 
     if contexto_memoria is None:
+        contexto_memoria = obter_ultimos_aprendizados(
+            10
+        )
 
-        try:
-            contexto_memoria = (
-                obter_ultimos_aprendizados(10)
-            )
-
-        except Exception:
-            contexto_memoria = []
-
-    # --------------------------------------------------
+    # =========================================================
     # 2. PESQUISA
-    # --------------------------------------------------
+    # =========================================================
 
     consultas = [
         objetivo,
         f"mercado e oportunidades {objetivo}",
-        f"negocios e servicos {localizacao}",
-        f"clientes e demanda {localizacao}",
-        f"tendencias de mercado Brasil {objetivo}",
-        f"ideias de negocios {objetivo}",
+        f"clientes e demanda {objetivo}",
+        f"serviços com demanda {localizacao}",
+        f"tendências de mercado Brasil {objetivo}",
+        f"formas legítimas de monetizar {objetivo}"
     ]
 
-    fontes = pesquisar_varias(
+    pesquisa = pesquisar_varias(
         consultas,
         localizacao
     )
 
-    if not fontes:
+    fontes = pesquisa[:40]
 
-        return {
-            "objetivo": objetivo,
-            "localizacao": localizacao,
-            "erro": (
-                "Nenhuma informação encontrada."
-            ),
-            "status": "erro"
-        }
+    # =========================================================
+    # 3. CONTEXTO DA MEMÓRIA
+    # =========================================================
 
-    # --------------------------------------------------
-    # 3. PREPARAR PESQUISA
-    # --------------------------------------------------
+    memoria_texto = json.dumps(
+        contexto_memoria,
+        ensure_ascii=False,
+        indent=2
+    )
 
-    contexto = ""
+    fontes_texto = json.dumps(
+        fontes,
+        ensure_ascii=False,
+        indent=2
+    )
 
-    for i, fonte in enumerate(
-        fontes[:40],
-        1
-    ):
-
-        contexto += (
-            f"FONTE {i}\n"
-            f"Título: {fonte.get('titulo')}\n"
-            f"Site: {fonte.get('site')}\n"
-            f"Resumo: {fonte.get('resumo')}\n"
-            f"URL: {fonte.get('url')}\n\n"
-        )
-
-    # --------------------------------------------------
-    # 4. PREPARAR MEMÓRIA
-    # --------------------------------------------------
-
-    memoria_texto = ""
-
-    if contexto_memoria:
-
-        for i, aprendizado in enumerate(
-            contexto_memoria,
-            1
-        ):
-
-            memoria_texto += (
-                f"APRENDIZADO {i}\n"
-                f"Estratégia: "
-                f"{aprendizado.get('estrategia')}\n"
-                f"Aprendizado: "
-                f"{aprendizado.get('aprendizado')}\n"
-                f"Evidências: "
-                f"{aprendizado.get('evidencias')}\n"
-                f"Impacto: "
-                f"{aprendizado.get('impacto')}\n\n"
-            )
-
-    else:
-
-        memoria_texto = (
-            "Nenhum aprendizado anterior disponível."
-        )
-
-    # --------------------------------------------------
-    # 5. PROMPT DO CÉREBRO
-    # --------------------------------------------------
+    # =========================================================
+    # 4. PROMPT DO CÉREBRO
+    # =========================================================
 
     prompt = f"""
 Você é o Cérebro da Money AI.
 
-Sua função é transformar pesquisa de mercado,
-memória de experiências anteriores e resultados
-em decisões operacionais.
+A Money AI é um agente criado para encontrar,
+testar e desenvolver formas legítimas de gerar
+receita online.
 
-A Money AI começa com R$0 de capital.
-
-OBJETIVO:
+OBJETIVO ATUAL:
 {objetivo}
 
 LOCALIZAÇÃO:
 {localizacao}
 
-MEMÓRIA:
+MEMÓRIA DE APRENDIZADOS ANTERIORES:
 {memoria_texto}
 
 PESQUISA ATUAL:
-{contexto}
+{fontes_texto}
 
-REGRAS:
+Sua função NÃO é simplesmente listar ideias.
 
-1. Não invente fatos, clientes, preços ou resultados.
+Você deve:
 
-2. Diferencie evidência, hipótese e decisão.
+1. analisar as oportunidades encontradas;
+2. considerar o que a Money AI já aprendeu;
+3. evitar repetir estratégias que apresentaram
+   resultados ruins sem uma justificativa;
+4. preservar e aprofundar estratégias que
+   apresentaram sinais positivos;
+5. identificar oportunidades que possam ser
+   testadas com custo zero ou muito baixo;
+6. escolher uma estratégia concreta;
+7. definir uma oferta concreta;
+8. identificar o cliente-alvo;
+9. escolher um canal;
+10. definir a próxima ação executável;
+11. decidir qual ação o Executor deve realizar;
+12. registrar o que deverá ser aprendido com o teste.
 
-3. Use a memória para melhorar decisões futuras.
+REGRA IMPORTANTE:
 
-4. Não repita automaticamente estratégias que
-apresentaram resultados ruins.
+A Money AI possui R$0 de capital inicial.
 
-5. Se uma estratégia apresentou sinais positivos,
-considere aprofundá-la.
+Portanto, priorize estratégias que possam começar
+sem investimento financeiro.
 
-6. R$0 de capital operacional.
+A Money AI não deve:
 
-7. Não recomende golpes, spam, fraude ou atividades ilegais.
+- movimentar dinheiro sem autorização;
+- criar contas sem autorização;
+- realizar compromissos legais;
+- enviar mensagens externas sem autorização;
+- publicar externamente sem autorização;
+- inventar resultados;
+- considerar receita inexistente como receita real.
 
-8. Não prometa ganhos.
+AÇÕES DISPONÍVEIS AO EXECUTOR:
 
-9. A Money AI deve agir como operadora de um negócio,
-não apenas como consultora.
+- aguardar
+- pesquisar
+- analisar
+- criar_oferta
+- criar_proposta
+- criar_conteudo
+- testar_estrategia
 
-10. Escolha UMA oportunidade principal.
+ESCOLHA EXATAMENTE UMA.
 
-11. A oportunidade deve ser específica.
+A ação deve representar a PRÓXIMA etapa lógica
+do processo.
 
-12. O objetivo é chegar à primeira receita real.
+Se ainda faltar informação:
+"pesquisar"
 
-13. Priorize ações que possam ser realizadas sem
-investimento inicial.
+Se a oportunidade estiver suficientemente
+entendida, mas ainda precisar ser estruturada:
+"analisar"
 
-14. Ações externas envolvendo contas, mensagens,
-publicações ou dinheiro devem respeitar permissões.
+Se for hora de montar uma oferta:
+"criar_oferta"
 
-15. Se a próxima etapa puder ser realizada internamente,
-ela pode ser executada sem pedir permissão.
+Se for hora de preparar uma proposta comercial:
+"criar_proposta"
 
-16. Não considere uma oportunidade validada apenas
-porque parece interessante.
+Se for hora de produzir material:
+"criar_conteudo"
 
-17. Use evidências da pesquisa.
+Se já existir uma estratégia pronta para teste:
+"testar_estrategia"
 
-18. Se faltar informação, indique exatamente o que
-precisa ser pesquisado.
+Se nenhuma ação segura fizer sentido:
+"aguardar"
 
-19. Pense em sequência:
-pesquisa → decisão → execução → medição → aprendizado.
+Não escolha uma ação apenas para gerar atividade.
+A ação deve aproximar a Money AI da geração
+real de receita.
 
-20. O próximo passo deve aproximar a Money AI da
-primeira receita.
+RETORNE SOMENTE JSON VÁLIDO.
 
-RESPONDA SOMENTE COM JSON VÁLIDO.
-
-ESTRUTURA:
+FORMATO:
 
 {{
     "objetivo": "...",
@@ -200,13 +190,8 @@ ESTRUTURA:
         {{
             "nome": "...",
             "descricao": "...",
-            "evidencias": [],
-            "demanda": "...",
-            "concorrencia": "...",
-            "custos": "...",
-            "riscos": "...",
-            "modelo_receita": "...",
-            "nivel_confianca": "baixo|medio|alto"
+            "potencial": "...",
+            "custo_inicial": 0
         }}
     ],
 
@@ -217,161 +202,186 @@ ESTRUTURA:
         "problema": "...",
         "oferta": "...",
         "canal": "...",
-        "preco_teste": "...",
+        "preco_teste": 0,
         "custo_teste": 0,
         "acao_imediata": "...",
-        "acao_executor": "pesquisar|analisar|criar_oferta|criar_proposta|criar_conteudo|testar_estrategia|aguardar",
+        "acao_executor": "...",
         "precisa_permissao": false,
         "motivo_escolha": "..."
     }},
 
+    "aprendizado_esperado": "...",
+
     "proximo_passo": "...",
 
-    "pesquisa_adicional_necessaria": [],
+    "pesquisa_adicional_necessaria": true,
 
     "fontes_utilizadas": []
 }}
-
-IMPORTANTE:
-
-- custo_teste deve ser número.
-- Na fase R$0, custo_teste deve ser 0.
-- acao_executor deve representar exatamente a ação
-que o Executor deverá realizar.
-- Se a ação for preparar uma oferta, use
-"criar_oferta".
-- Se for preparar uma proposta, use
-"criar_proposta".
-- Se for apenas pesquisar, use "pesquisar".
-- Se for produzir conteúdo, use "criar_conteudo".
-- Não coloque explicações fora do JSON.
 """
 
-    # --------------------------------------------------
-    # 6. CHAMADA AO CÉREBRO
-    # --------------------------------------------------
+    # =========================================================
+    # 5. CHAMADA GEMINI
+    # =========================================================
 
     try:
 
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
+        cliente = genai.Client(
+            api_key=GEMINI_API_KEY
+        )
+
+        resposta = cliente.models.generate_content(
+            model=MODELO,
             contents=prompt
         )
 
-        texto = response.text.strip()
+        texto = resposta.text.strip()
 
+        # Remove possíveis blocos Markdown
         if texto.startswith("```"):
-
             texto = texto.replace(
                 "```json",
                 ""
-            )
-
-            texto = texto.replace(
+            ).replace(
                 "```",
                 ""
+            ).strip()
+
+        dados = json.loads(
+            texto
+        )
+
+        return {
+            "status": "sucesso",
+            "objetivo": objetivo,
+            "localizacao": localizacao,
+            "decisao": dados.get(
+                "decisao",
+                {}
+            ),
+            "oportunidades": dados.get(
+                "oportunidades",
+                []
+            ),
+            "aprendizado_utilizado": dados.get(
+                "aprendizado_utilizado",
+                []
+            ),
+            "aprendizado_esperado": dados.get(
+                "aprendizado_esperado"
+            ),
+            "proximo_passo": dados.get(
+                "proximo_passo"
+            ),
+            "pesquisa_adicional_necessaria": dados.get(
+                "pesquisa_adicional_necessaria",
+                False
+            ),
+            "fontes_utilizadas": dados.get(
+                "fontes_utilizadas",
+                []
             )
-
-            texto = texto.strip()
-
-        try:
-
-            decisao = json.loads(
-                texto
-            )
-
-        except json.JSONDecodeError:
-
-            return {
-                "objetivo": objetivo,
-                "localizacao": localizacao,
-                "analise": response.text,
-                "fontes": fontes,
-                "erro": (
-                    "A IA respondeu, mas não "
-                    "retornou JSON válido."
-                ),
-                "status": "erro"
-            }
-
-        decisao["fontes_brutas"] = fontes
-        decisao["status"] = "sucesso"
-
-        return decisao
-
-    # --------------------------------------------------
-    # 7. TRATAMENTO DE ERROS
-    # --------------------------------------------------
+        }
 
     except Exception as erro:
 
-        erro_texto = str(erro)
+        mensagem = str(erro)
 
-        if "429" in erro_texto:
+        if (
+            "429" in mensagem
+            or "RESOURCE_EXHAUSTED" in mensagem
+            or "quota" in mensagem.lower()
+        ):
 
             return {
-                "objetivo": objetivo,
-                "localizacao": localizacao,
+                "status": "erro_cota",
                 "erro": (
                     "Cota da Gemini excedida. "
-                    "Nenhuma nova tentativa foi "
-                    "realizada para evitar consumir "
-                    "mais requisições."
+                    "Nenhuma nova tentativa foi realizada "
+                    "para evitar consumir mais requisições."
                 ),
-                "detalhes": erro_texto,
-                "status": "erro_cota"
+                "detalhes": mensagem,
+                "objetivo": objetivo,
+                "localizacao": localizacao
             }
 
-        if "503" in erro_texto:
-
-            time.sleep(3)
+        # Uma única tentativa adicional apenas
+        # para erros temporários de servidor.
+        if (
+            "503" in mensagem
+            or "UNAVAILABLE" in mensagem
+        ):
 
             try:
 
-                response = client.models.generate_content(
-                    model="gemini-3.6-flash",
+                time.sleep(2)
+
+                resposta = cliente.models.generate_content(
+                    model=MODELO,
                     contents=prompt
                 )
 
-                texto = response.text.strip()
+                texto = resposta.text.strip()
 
                 if texto.startswith("```"):
-
                     texto = texto.replace(
                         "```json",
                         ""
-                    )
-
-                    texto = texto.replace(
+                    ).replace(
                         "```",
                         ""
-                    )
+                    ).strip()
 
-                    texto = texto.strip()
-
-                decisao = json.loads(
+                dados = json.loads(
                     texto
                 )
 
-                decisao["fontes_brutas"] = fontes
-                decisao["status"] = "sucesso"
-
-                return decisao
+                return {
+                    "status": "sucesso",
+                    "objetivo": objetivo,
+                    "localizacao": localizacao,
+                    "decisao": dados.get(
+                        "decisao",
+                        {}
+                    ),
+                    "oportunidades": dados.get(
+                        "oportunidades",
+                        []
+                    ),
+                    "aprendizado_utilizado": dados.get(
+                        "aprendizado_utilizado",
+                        []
+                    ),
+                    "aprendizado_esperado": dados.get(
+                        "aprendizado_esperado"
+                    ),
+                    "proximo_passo": dados.get(
+                        "proximo_passo"
+                    ),
+                    "pesquisa_adicional_necessaria": dados.get(
+                        "pesquisa_adicional_necessaria",
+                        False
+                    ),
+                    "fontes_utilizadas": dados.get(
+                        "fontes_utilizadas",
+                        []
+                    )
+                }
 
             except Exception as segundo_erro:
 
                 return {
-                    "objetivo": objetivo,
-                    "localizacao": localizacao,
+                    "status": "erro",
                     "erro": str(
                         segundo_erro
                     ),
-                    "status": "erro"
+                    "objetivo": objetivo,
+                    "localizacao": localizacao
                 }
 
         return {
+            "status": "erro",
+            "erro": mensagem,
             "objetivo": objetivo,
-            "localizacao": localizacao,
-            "erro": erro_texto,
-            "status": "erro"
+            "localizacao": localizacao
         }
