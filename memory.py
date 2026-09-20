@@ -309,6 +309,61 @@ def registrar_feedback_acao_externa(acao_id, resposta=None, interesse=None, vend
     return None
 
 
+def obter_metricas_comerciais(limite=100):
+    memoria = carregar_memoria()
+    acoes = memoria["acoes_externas"][-limite:]
+    metricas = {
+        "acoes_preparadas": len(acoes),
+        "autorizadas": 0,
+        "executadas": 0,
+        "falhas": 0,
+        "respostas": 0,
+        "interesses": 0,
+        "vendas": 0,
+        "receita_confirmada": 0,
+        "custos_confirmados": 0
+    }
+    por_estrategia = {}
+    for acao in acoes:
+        status = acao.get("status")
+        if status == "autorizada":
+            metricas["autorizadas"] += 1
+        elif status == "executada":
+            metricas["executadas"] += 1
+        elif status == "falhou":
+            metricas["falhas"] += 1
+
+        estrategia = acao.get("estrategia") or "estratégia sem nome"
+        bloco = por_estrategia.setdefault(estrategia, {
+            "acoes": 0, "executadas": 0, "respostas": 0,
+            "interesses": 0, "vendas": 0, "receita_confirmada": 0,
+            "custos_confirmados": 0
+        })
+        bloco["acoes"] += 1
+        if status == "executada":
+            bloco["executadas"] += 1
+
+        for feedback in acao.get("feedback", []) or []:
+            if feedback.get("resposta"):
+                metricas["respostas"] += 1
+                bloco["respostas"] += 1
+            if feedback.get("interesse"):
+                metricas["interesses"] += 1
+                bloco["interesses"] += 1
+            if feedback.get("venda"):
+                metricas["vendas"] += 1
+                bloco["vendas"] += 1
+                receita = float(feedback.get("receita", 0) or 0)
+                custo = float(feedback.get("custo", 0) or 0)
+                metricas["receita_confirmada"] += receita
+                metricas["custos_confirmados"] += custo
+                bloco["receita_confirmada"] += receita
+                bloco["custos_confirmados"] += custo
+
+    metricas["por_estrategia"] = por_estrategia
+    return metricas
+
+
 def obter_acoes_externas(status=None, limite=20):
     memoria = carregar_memoria()
     acoes = memoria["acoes_externas"]
