@@ -395,4 +395,3 @@ def obter_resumo():
         "acoes_externas": len(memoria["acoes_externas"]),
         "acoes_externas_pendentes": len([x for x in memoria["acoes_externas"] if x.get("status") == "aguardando_autorizacao"])
     }
-}
