@@ -145,7 +145,7 @@ class Executor:
         acao = registrar_acao_externa(
             tipo="abordagem_comercial", alvo=cliente, canal=canal, mensagem=mensagem,
             estrategia=decisao.get("estrategia"),
-            contexto={"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste")}
+            contexto={"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste"), "url_alvo": decisao.get("url_alvo")}
         )
         registrar_evento("abordagem_preparada", f"Abordagem preparada para {cliente} no canal {canal}; aguardando autorização.")
         return {"status": "executado", "acao": "preparar_abordagem", "resultado": {"receita": 0, "custo": 0, "acao_externa_id": acao["id"], "status_acao_externa": acao["status"], "alvo": cliente, "canal": canal, "mensagem": mensagem}}
