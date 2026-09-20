@@ -16,6 +16,7 @@ GEMINI_API_KEY = os.getenv(
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")
+AI_PROVIDER = os.getenv("AI_PROVIDER", "auto").strip().lower()
 
 MODELOS = [modelo.strip() for modelo in os.getenv("GEMINI_MODELS", "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash-lite").split(",") if modelo.strip()]
 
@@ -76,7 +77,16 @@ def analisar_oportunidade(
     contexto_memoria=None
 ):
 
-    if not GEMINI_API_KEY and not OPENAI_API_KEY:
+    if AI_PROVIDER not in {"auto", "gemini", "openai"}:
+        AI_PROVIDER = "auto"
+
+    if AI_PROVIDER == "gemini" and not GEMINI_API_KEY:
+        return {"status": "erro_configuracao", "erro": "AI_PROVIDER=gemini, mas GEMINI_API_KEY não está configurada.", "objetivo": objetivo, "localizacao": localizacao}
+
+    if AI_PROVIDER == "openai" and not OPENAI_API_KEY:
+        return {"status": "erro_configuracao", "erro": "AI_PROVIDER=openai, mas OPENAI_API_KEY não está configurada.", "objetivo": objetivo, "localizacao": localizacao}
+
+    if AI_PROVIDER == "auto" and not GEMINI_API_KEY and not OPENAI_API_KEY:
         return {
             "status": "erro_configuracao",
             "erro": "Nenhum provedor de IA configurado. Configure GEMINI_API_KEY ou OPENAI_API_KEY.",
@@ -284,11 +294,11 @@ FORMATO:
         modelo_usado = None
         erro = None
 
-        if GEMINI_API_KEY:
+        if AI_PROVIDER in {"auto", "gemini"} and GEMINI_API_KEY:
             cliente = genai.Client(api_key=GEMINI_API_KEY)
             dados, modelo_usado, erro = _gerar_json(cliente, prompt)
 
-        if dados is None:
+        if dados is None and AI_PROVIDER in {"auto", "openai"}:
             dados_openai, modelo_openai, erro_openai = _gerar_openai(prompt)
             if dados_openai is not None:
                 dados = dados_openai
@@ -302,6 +312,7 @@ FORMATO:
                     "erro_openai": erro_openai,
                     "modelos_tentados": MODELOS,
                     "openai_configurado": bool(OPENAI_API_KEY),
+                    "ai_provider": AI_PROVIDER,
                     "objetivo": objetivo,
                     "localizacao": localizacao
                 }
@@ -311,6 +322,7 @@ FORMATO:
             "objetivo": objetivo,
             "localizacao": localizacao,
             "modelo_utilizado": modelo_usado,
+            "ai_provider": AI_PROVIDER,
             "decisao": dados.get("decisao", {}),
             "oportunidades": dados.get("oportunidades", []),
             "aprendizado_utilizado": dados.get("aprendizado_utilizado", []),
