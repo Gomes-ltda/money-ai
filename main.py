@@ -5,7 +5,7 @@ from ai import analisar_oportunidade
 from agent import executar_ciclo
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
-from pagamentos import criar_cobranca_pix, validar_webhook, processar_webhook, sincronizar_pagamento
+from pagamentos import criar_cobranca_pix, criar_order_pix_teste, validar_webhook, processar_webhook, sincronizar_pagamento
 from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca, obter_pagamento_por_id
 
 
@@ -90,6 +90,8 @@ HTML = """
     <hr>
     <h2>Pagamentos</h2>
     <div id="pagamentos"></div>
+    <button onclick="criarTestePix()">Criar teste Pix (sandbox)</button>
+    <div id="testePix"></div>
 
     <script>
         async function executarCiclo() {
@@ -206,6 +208,37 @@ HTML = """
                 }).join("");
             } catch (erro) {
                 resultado.innerHTML = "<p>Erro ao carregar pagamentos.</p>";
+            }
+        }
+
+        async function criarTestePix() {
+            const resultado = document.getElementById("testePix");
+            const token = obterToken();
+            if (!token) {
+                resultado.innerHTML = "<p>Informe o token de autorização primeiro.</p>";
+                return;
+            }
+            resultado.textContent = "Criando order Pix de teste...";
+            try {
+                const resposta = await fetch("/pagamentos/teste-pix", {
+                    method: "POST",
+                    headers: {"Authorization": "Bearer " + token}
+                });
+                const dados = await resposta.json();
+                if (!resposta.ok) {
+                    resultado.innerHTML = "<p>" + (dados.erro || "Falha no teste.") + "</p>";
+                    return;
+                }
+                const p = dados.pagamento || {};
+                const qr = p.qr_code || "";
+                resultado.innerHTML =
+                    "<p><b>Teste criado:</b> " + (p.valor || 0).toLocaleString("pt-BR", {style:"currency",currency:"BRL"}) + "</p>" +
+                    (p.ticket_url ? "<p><a href='" + p.ticket_url + "' target='_blank' rel='noopener'>Abrir instruções do Pix de teste</a></p>" : "") +
+                    (qr ? "<p><b>Pix copia e cola:</b></p><textarea readonly style='width:100%;height:110px'>" + qr + "</textarea>" : "") +
+                    "<p>Este teste usa o sandbox do Mercado Pago e não movimenta dinheiro real.</p>";
+                carregarPagamentos();
+            } catch (erro) {
+                resultado.textContent = "Erro ao criar teste: " + erro;
             }
         }
 
@@ -405,7 +438,7 @@ def pagamento_sincronizar(pagamento_id):
 @app.route("/pagamentos/<pagamento_id>", methods=["GET"])
 def pagamento_detalhe(pagamento_id):
     token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
-    if not verificar_token_aprovacao(token):
+    if not validar_token():
         return jsonify({"erro": "Não autorizado."}), 401
 
     pagamento = obter_pagamento_por_id(pagamento_id)
@@ -463,6 +496,14 @@ def criar_pagamento_pix():
         if estrategia and pagamento.get("id"):
             atualizar_pagamento(pagamento["id"], estrategia=estrategia)
             pagamento["estrategia"] = estrategia
+    return jsonify(resultado), (200 if resultado.get("status") == "criado" else 400)
+
+
+@app.route("/pagamentos/teste-pix", methods=["POST"])
+def pagamento_teste_pix():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    resultado = criar_order_pix_teste()
     return jsonify(resultado), (200 if resultado.get("status") == "criado" else 400)
 
 
