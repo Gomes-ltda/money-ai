@@ -11,6 +11,7 @@ ACOES_INTERNAS = {
     "criar_proposta",
     "criar_conteudo",
     "pesquisar_alvo",
+    "validar_alvo",
     "preparar_abordagem",
     "testar_estrategia"
 }
@@ -22,6 +23,7 @@ CADEIA_PROCESSO = [
     ("criar_oferta", "Montar a oferta inicial a partir da análise."),
     ("criar_proposta", "Preparar a proposta comercial a partir da oferta."),
     ("pesquisar_alvo", "Encontrar um alvo público concreto antes da abordagem."),
+    ("validar_alvo", "Verificar evidências públicas do problema antes da abordagem."),
     ("preparar_abordagem", "Preparar a abordagem externa para autorização do usuário.")
 ]
 
