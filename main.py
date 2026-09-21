@@ -179,6 +179,17 @@ HTML = """
             } catch (erro) {}
         }
 
+        async function sincronizarPagamentosAutomaticamente() {
+            const token = obterToken();
+            if (!token) return;
+            try {
+                await fetch("/pagamentos/sincronizar-pendentes", {
+                    method: "POST",
+                    headers: {"Authorization": "Bearer " + token}
+                });
+            } catch (erro) {}
+        }
+
         async function carregarPagamentos() {
             const resultado = document.getElementById("pagamentos");
             const token = obterToken();
@@ -268,12 +279,14 @@ HTML = """
                 carregarAcoes();
                 carregarAcoesEmAndamento();
                 carregarHistorico();
+                sincronizarPagamentosAutomaticamente();
                 carregarPagamentos();
                 intervaloAcoes = setInterval(() => {
                     if (obterToken()) {
                         carregarAcoes();
                         carregarAcoesEmAndamento();
                         carregarHistorico();
+                        sincronizarPagamentosAutomaticamente();
                         carregarPagamentos();
                     }
                 }, 10000);
