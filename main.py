@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template_string
 import os
 
-from ai import analisar_oportunidade
+from ai import analisar_oportunidade, analisar_pedido_cliente
 from agent import executar_ciclo
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
@@ -354,9 +354,22 @@ ADMIN_HTML = """
                     "<label>Prazo</label><input id='pp-"+p.id+"' value='"+esc(prop.prazo)+"' placeholder='Ex.: 3 dias úteis'>"+
                     "<label>Entrega</label><textarea id='et-"+p.id+"' placeholder='Resultado entregue ao cliente'>"+esc(ent.texto)+"</textarea>"+
                     "<label>Link da entrega (opcional)</label><input id='eu-"+p.id+"' value='"+esc(ent.url)+"' placeholder='https://...'>"+
-                    "<button onclick='salvarPedidoCliente(&quot;"+p.id+"&quot;)'>Salvar / publicar</button> <a href='/pedido/"+encodeURIComponent(p.token_publico)+"' target='_blank'>Abrir página do cliente</a></div>";
+                    "<button onclick='analisarPedidoCliente(&quot;"+p.id+"&quot;)'>Analisar com a Evolia</button> <button onclick='salvarPedidoCliente(&quot;"+p.id+"&quot;)'>Salvar / publicar</button> <a href='/pedido/"+encodeURIComponent(p.token_publico)+"' target='_blank'>Abrir página do cliente</a></div>";
                 }).join("");
             } catch(e) {}
+        }
+        async function analisarPedidoCliente(id) {
+            const token=obterToken();
+            if (!token) return;
+            const resposta=await fetch("/pedidos-clientes/"+encodeURIComponent(id)+"/analisar",{method:"POST",headers:{"Authorization":"Bearer "+token}});
+            const dados=await resposta.json();
+            if(!resposta.ok){alert(dados.erro||"Não foi possível analisar o pedido.");return;}
+            const a=dados.analise||{};
+            if(a.proposta_cliente) document.getElementById("pt-"+id).value=a.proposta_cliente;
+            if(a.valor_sugerido !== null && a.valor_sugerido !== undefined) document.getElementById("pv-"+id).value=a.valor_sugerido;
+            if(a.prazo_sugerido) document.getElementById("pp-"+id).value=a.prazo_sugerido;
+            document.getElementById("st-"+id).value="em_analise";
+            alert("Análise concluída. Revise a proposta antes de publicar.");
         }
         async function salvarPedidoCliente(id) {
             const token=obterToken();
@@ -592,6 +605,43 @@ def pedidos_clientes():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     return jsonify({"pedidos": obter_pedidos_clientes()})
 
+
+@app.route("/pedidos-clientes/<pedido_id>/analisar", methods=["POST"])
+def analisar_pedido(pedido_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    pedido = obter_pedido_cliente(pedido_id)
+    if not pedido:
+        return jsonify({"erro": "Pedido não encontrado."}), 404
+
+    resultado = analisar_pedido_cliente(pedido)
+    if resultado.get("status") != "sucesso":
+        return jsonify(resultado), 503
+
+    analise = resultado.get("analise") or {}
+    proposta = {
+        "texto": analise.get("proposta_cliente") or analise.get("resumo") or "",
+        "valor": analise.get("valor_sugerido"),
+        "prazo": analise.get("prazo_sugerido"),
+        "escopo": analise.get("escopo") or [],
+        "nao_incluido": analise.get("nao_incluido") or [],
+        "perguntas": analise.get("perguntas") or [],
+        "justificativa_preco": analise.get("justificativa_preco"),
+        "riscos": analise.get("riscos") or [],
+        "confianca": analise.get("confianca")
+    }
+    atualizado = atualizar_pedido_cliente(
+        pedido_id,
+        status="em_analise",
+        proposta=proposta,
+        observacao="Pedido analisado pela Evolia; proposta aguarda revisão/publicação."
+    )
+    return jsonify({
+        "status": "analisado",
+        "analise": analise,
+        "pedido": atualizado,
+        "fontes_utilizadas": resultado.get("fontes_utilizadas", [])
+    }), 200
 
 @app.route("/pedidos-clientes/<pedido_id>", methods=["POST"])
 def atualizar_pedido(pedido_id):
