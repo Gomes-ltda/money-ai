@@ -30,120 +30,27 @@ ADMIN_HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Evolia AI</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 820px;
-            margin: 0 auto;
-            padding: 28px 18px 50px;
-            color: #111;
-            background: #fff;
-        }
-        .topo {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 28px;
-        }
-        .marca {
-            font-size: 34px;
-            font-weight: 700;
-            margin: 0;
-        }
-        .status {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #ccc;
-            border-radius: 999px;
-            padding: 8px 12px;
-            font-size: 14px;
-        }
-        .ponto {
-            width: 9px;
-            height: 9px;
-            border-radius: 50%;
-            background: #222;
-        }
-        .subtitulo {
-            color: #555;
-            margin-top: 6px;
-        }
-        .painel-ciclo {
-            border: 1px solid #d4d4d4;
-            border-radius: 14px;
-            padding: 22px;
-            margin-bottom: 24px;
-        }
-        .painel-ciclo h2 {
-            margin: 0 0 8px;
-        }
-        .objetivo-interno {
-            color: #444;
-            margin: 0 0 20px;
-        }
-        .etapas {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin: 18px 0 22px;
-        }
-        .etapa {
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            padding: 13px;
-            min-height: 66px;
-        }
-        .etapa strong {
-            display: block;
-            margin-bottom: 5px;
-        }
-        .etapa span {
-            color: #666;
-            font-size: 13px;
-        }
-        .botao-principal {
-            width: 100%;
-            padding: 14px 18px;
-            border: 1px solid #111;
-            border-radius: 9px;
-            background: #111;
-            color: #fff;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        .botao-principal:disabled {
-            opacity: .55;
-            cursor: wait;
-        }
-        #resultado {
-            white-space: pre-wrap;
-            margin-top: 18px;
-            line-height: 1.5;
-        }
-        .info {
-            color: #666;
-            font-size: 13px;
-            margin-top: 12px;
-        }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin-top: 8px;
-            box-sizing: border-box;
-        }
-        button {
-            margin-top: 12px;
-            padding: 12px 20px;
-            cursor: pointer;
-        }
-        @media (max-width: 620px) {
-            .topo { align-items: flex-start; flex-direction: column; }
-            .etapas { grid-template-columns: 1fr 1fr; }
-        }
-        @media (max-width: 420px) {
-            .etapas { grid-template-columns: 1fr; }
-        }
+        body { font-family: Arial, sans-serif; max-width: 820px; margin: 0 auto; padding: 28px 18px 50px; color: #111; background: #fff; }
+        .topo { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 28px; }
+        .marca { font-size: 34px; font-weight: 700; margin: 0; }
+        .status { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #ccc; border-radius: 999px; padding: 8px 12px; font-size: 14px; }
+        .ponto { width: 9px; height: 9px; border-radius: 50%; background: #222; }
+        .subtitulo { color: #555; margin-top: 6px; }
+        .painel-ciclo { border: 1px solid #d4d4d4; border-radius: 14px; padding: 22px; margin-bottom: 24px; }
+        .painel-ciclo h2 { margin: 0 0 8px; }
+        .objetivo-interno { color: #444; margin: 0 0 20px; }
+        .etapas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0 22px; }
+        .etapa { border: 1px solid #ddd; border-radius: 10px; padding: 13px; min-height: 66px; }
+        .etapa strong { display: block; margin-bottom: 5px; }
+        .etapa span { color: #666; font-size: 13px; }
+        .botao-principal { width: 100%; padding: 14px 18px; border: 1px solid #111; border-radius: 9px; background: #111; color: #fff; font-size: 16px; cursor: pointer; }
+        .botao-principal:disabled { opacity: .55; cursor: wait; }
+        #resultado { white-space: pre-wrap; margin-top: 18px; line-height: 1.5; }
+        .info { color: #666; font-size: 13px; margin-top: 12px; }
+        input { width: 100%; padding: 10px; margin-top: 8px; box-sizing: border-box; }
+        button { margin-top: 12px; padding: 12px 20px; cursor: pointer; }
+        @media (max-width: 620px) { .topo { align-items: flex-start; flex-direction: column; } .etapas { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 420px) { .etapas { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -237,10 +144,21 @@ ADMIN_HTML = """
             document.getElementById("loginStatus").textContent = "";
         }
 
+        function obterToken() {
+            return document.getElementById("tokenAutorizacao").value.trim() || sessionStorage.getItem("evolia_token") || "";
+        }
+
         async function executarCiclo() {
             const resultado = document.getElementById("resultado");
             const botao = document.getElementById("botaoCiclo");
             const statusGeral = document.getElementById("statusGeral");
+            const token = obterToken();
+
+            if (!token) {
+                resultado.textContent = "Token de autorização não encontrado. Entre novamente no painel.";
+                statusGeral.textContent = "Acesso necessário";
+                return;
+            }
 
             resultado.textContent = "Iniciando ciclo: observando, pesquisando e analisando...";
             statusGeral.textContent = "Executando";
@@ -249,7 +167,10 @@ ADMIN_HTML = """
             try {
                 const resposta = await fetch("/ciclo", {
                     method: "POST",
-                    headers: {"Content-Type": "application/json"},
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + token
+                    },
                     body: JSON.stringify({})
                 });
 
@@ -268,9 +189,6 @@ ADMIN_HTML = """
             } finally {
                 botao.disabled = false;
             }
-        }
-        function obterToken() {
-            return document.getElementById("tokenAutorizacao").value.trim() || sessionStorage.getItem("evolia_token") || "";
         }
         async function carregarAcoes() {
             const resultado = document.getElementById("acoes");
@@ -315,11 +233,10 @@ ADMIN_HTML = """
                 const dados = await resposta.json();
                 const emAndamento = dados.acoes || [];
                 if (emAndamento.length > 0) {
-                    document.getElementById("statusAcao").textContent = "Há " + emAndamento.length + " ação(ões) externa(s) em execução. A Evolia está acompanhando o resultado."; 
+                    document.getElementById("statusAcao").textContent = "Há " + emAndamento.length + " ação(ões) externa(s) em execução. A Evolia está acompanhando o resultado.";
                 }
             } catch (erro) {}
         }
-
         async function sincronizarPagamentosAutomaticamente() {
             const token = obterToken();
             if (!token) return;
@@ -330,7 +247,6 @@ ADMIN_HTML = """
                 });
             } catch (erro) {}
         }
-
         async function carregarPagamentos() {
             const resultado = document.getElementById("pagamentos");
             const token = obterToken();
@@ -362,7 +278,6 @@ ADMIN_HTML = """
                 resultado.innerHTML = "<p>Erro ao carregar pagamentos.</p>";
             }
         }
-
         async function criarTestePix() {
             const resultado = document.getElementById("testePix");
             const token = obterToken();
@@ -393,7 +308,6 @@ ADMIN_HTML = """
                 resultado.textContent = "Erro ao criar teste: " + erro;
             }
         }
-
         async function carregarHistorico() {
             const token = obterToken();
             if (!token) return;
@@ -412,7 +326,6 @@ ADMIN_HTML = """
                     "</p>";
             } catch (erro) {}
         }
-
         let intervaloAcoes = null;
         function iniciarAtualizacaoAutomatica() {
             if (intervaloAcoes) clearInterval(intervaloAcoes);
@@ -507,10 +420,7 @@ def painel_status():
 
 @app.route("/health")
 def health():
-    return jsonify({
-        "status": "online",
-        "nome": "Evolia AI"
-    })
+    return jsonify({"status": "online", "nome": "Evolia AI"})
 
 
 @app.route("/acoes-em-andamento")
@@ -556,17 +466,9 @@ def decidir_acao(acao_id, decisao):
         execucao = iniciar_acao_autorizada(acao_id)
 
         if execucao.get("status") == "executando":
-            return jsonify({
-                "status": "executando",
-                "mensagem": "Ação autorizada e execução externa iniciada.",
-                "execucao": execucao
-            })
+            return jsonify({"status": "executando", "mensagem": "Ação autorizada e execução externa iniciada.", "execucao": execucao})
 
-        return jsonify({
-            "status": execucao.get("status", "falhou"),
-            "mensagem": "Ação autorizada, mas a execução não foi iniciada.",
-            "execucao": execucao
-        }), 502
+        return jsonify({"status": execucao.get("status", "falhou"), "mensagem": "Ação autorizada, mas a execução não foi iniciada.", "execucao": execucao}), 502
 
     atualizar_acao_externa(acao_id, "cancelada", {"origem": "interface_usuario"})
     return jsonify({"status": "cancelada", "mensagem": "Ação recusada e cancelada."})
@@ -578,10 +480,7 @@ def acoes_historico():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     acoes = obter_acoes_externas(limite=100)
     concluidas = [x for x in acoes if x.get("status") in {"executada", "falhou", "cancelada"}]
-    return jsonify({
-        "acoes": concluidas[-30:],
-        "metricas": obter_metricas_comerciais()
-    })
+    return jsonify({"acoes": concluidas[-30:], "metricas": obter_metricas_comerciais()})
 
 
 @app.route("/acoes/<acao_id>/feedback", methods=["POST"])
@@ -620,24 +519,13 @@ def pagamentos_sincronizar_pendentes():
     if not validar_token() and (not cron_token or token != cron_token):
         return jsonify({"erro": "Não autorizado."}), 401
 
-    pendentes = [
-        p for p in obter_pagamentos(limite=200)
-        if p.get("status") in {"aguardando_pagamento", "processando", "pendente"}
-    ]
-    resultados = []
-    for pagamento in pendentes:
-        resultados.append(sincronizar_pagamento(pagamento.get("id")))
-
-    return jsonify({
-        "status": "sincronizado",
-        "quantidade": len(resultados),
-        "resultados": resultados
-    })
+    pendentes = [p for p in obter_pagamentos(limite=200) if p.get("status") in {"aguardando_pagamento", "processando", "pendente"}]
+    resultados = [sincronizar_pagamento(pagamento.get("id")) for pagamento in pendentes]
+    return jsonify({"status": "sincronizado", "quantidade": len(resultados), "resultados": resultados})
 
 
 @app.route("/pagamentos/<pagamento_id>/sincronizar", methods=["POST"])
 def pagamento_sincronizar(pagamento_id):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
     if not validar_token():
         return jsonify({"erro": "Não autorizado."}), 401
     resultado = sincronizar_pagamento(pagamento_id)
@@ -650,14 +538,11 @@ def pagamento_sincronizar(pagamento_id):
 
 @app.route("/pagamentos/<pagamento_id>", methods=["GET"])
 def pagamento_detalhe(pagamento_id):
-    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
     if not validar_token():
         return jsonify({"erro": "Não autorizado."}), 401
-
     pagamento = obter_pagamento_por_id(pagamento_id)
     if not pagamento:
         return jsonify({"erro": "Pagamento não encontrado."}), 404
-
     return jsonify({"pagamento": pagamento})
 
 
@@ -695,7 +580,6 @@ def criar_pagamento_pix():
         return jsonify({"erro": venda.get("motivo", "Venda não confirmada.")}), 409
 
     referencia = str(dados.get("referencia", "")).strip() or ("venda-" + acao_id[:32])
-
     resultado = criar_cobranca_pix(
         valor=valor,
         descricao=str(dados.get("descricao", "Serviço Evolia")).strip() or "Serviço Evolia",
@@ -726,7 +610,6 @@ def pagamentos_webhook():
     data_id = request.args.get("data.id") or ((dados.get("data") or {}).get("id"))
     if not validar_webhook(request.headers, data_id):
         return jsonify({"erro": "Assinatura do webhook inválida."}), 401
-
     resultado = processar_webhook(dados, data_id)
     return jsonify(resultado), 200
 
@@ -736,29 +619,14 @@ def ciclo():
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     dados = request.get_json(silent=True) or {}
-
-    objetivo = str(
-        dados.get(
-            "objetivo",
-            "Gerar receita de forma legítima e sustentável"
-        )
-    ).strip() or "Gerar receita de forma legítima e sustentável"
-
-    localizacao = str(
-        dados.get("localizacao", "Brasil")
-    ).strip() or "Brasil"
+    objetivo = str(dados.get("objetivo", "Gerar receita de forma legítima e sustentável")).strip() or "Gerar receita de forma legítima e sustentável"
+    localizacao = str(dados.get("localizacao", "Brasil")).strip() or "Brasil"
 
     try:
-        resultado = executar_ciclo(
-            objetivo,
-            localizacao
-        )
+        resultado = executar_ciclo(objetivo, localizacao)
         return jsonify(resultado)
     except Exception as erro:
-        return jsonify({
-            "status": "erro",
-            "erro": str(erro)
-        }), 500
+        return jsonify({"status": "erro", "erro": str(erro)}), 500
 
 
 @app.route("/analisar", methods=["POST"])
@@ -766,40 +634,20 @@ def analisar():
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     dados = request.get_json(silent=True) or {}
-
-    objetivo = str(
-        dados.get("objetivo", "")
-    ).strip()
-
-    localizacao = str(
-        dados.get("localizacao", "")
-    ).strip()
+    objetivo = str(dados.get("objetivo", "")).strip()
+    localizacao = str(dados.get("localizacao", "")).strip()
 
     if not objetivo:
-        return jsonify({
-            "erro": "Informe um objetivo."
-        }), 400
-
+        return jsonify({"erro": "Informe um objetivo."}), 400
     if not localizacao:
-        return jsonify({
-            "erro": "Informe sua cidade e estado."
-        }), 400
+        return jsonify({"erro": "Informe sua cidade e estado."}), 400
 
     try:
-        resultado = analisar_oportunidade(
-            objetivo,
-            localizacao
-        )
+        resultado = analisar_oportunidade(objetivo, localizacao)
         return jsonify(resultado)
     except Exception as erro:
-        return jsonify({
-            "status": "erro",
-            "erro": str(erro)
-        }), 500
+        return jsonify({"status": "erro", "erro": str(erro)}), 500
 
 
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=5000
-    )
+    app.run(host="0.0.0.0", port=5000)
