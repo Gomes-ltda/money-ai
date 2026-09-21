@@ -3,7 +3,7 @@ import uuid
 
 from Permissões import solicitar_permissao
 from pesquisa import pesquisar
-from memory import registrar_evento, registrar_teste, registrar_acao_externa, obter_acoes_externas
+from memory import registrar_evento, registrar_teste, registrar_acao_externa, obter_acoes_externas, registrar_lead
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
@@ -186,9 +186,42 @@ class Executor:
                 "resultado": {"receita": 0, "custo": 0, "candidatos": []}
             }
 
+        leads = []
+        for candidato in candidatos[:5]:
+            titulo = (candidato.get("titulo") or "").strip()
+            resumo = (candidato.get("resumo") or "").strip()
+            motivo = (
+                f"Alvo encontrado em pesquisa pública para o nicho '{nicho or cliente}'. "
+                f"O canal '{candidato.get('canal')}' possui URL específica e pode permitir contato."
+            )
+            evidencia = [
+                {"tipo": "url_publica", "url": candidato.get("url")},
+                {"tipo": "resultado_pesquisa", "resumo": resumo}
+            ]
+            lead = registrar_lead(
+                proveniencia="pesquisa_alvo",
+                url=candidato.get("url"),
+                canal=candidato.get("canal"),
+                nome=titulo,
+                resumo=resumo,
+                motivo_aderencia=motivo,
+                evidencia_publica=evidencia,
+                estrategia=decisao.get("estrategia"),
+                nicho=nicho,
+                problema=decisao.get("problema"),
+                oferta=decisao.get("oferta"),
+                confianca="media"
+            )
+            if lead:
+                leads.append(lead)
+
         alvo = candidatos[0]
         canal = alvo["canal"]
-        registrar_evento("alvo_pesquisado", f"Alvo público encontrado: {alvo['url']} via {canal}.")
+        lead_principal = leads[0] if leads else None
+        registrar_evento(
+            "alvo_pesquisado",
+            f"Alvo público encontrado: {alvo['url']} via {canal}; lead registrado com proveniência e evidências."
+        )
         return {
             "status": "executado",
             "acao": "pesquisar_alvo",
@@ -199,6 +232,8 @@ class Executor:
                 "url_alvo": alvo["url"],
                 "canal": canal,
                 "alvo_encontrado": alvo,
+                "lead_principal": lead_principal,
+                "leads_registrados": leads,
                 "candidatos": candidatos[:5]
             }
         }
