@@ -23,7 +23,7 @@ def validar_token():
     return False
 
 
-HTML = """
+ADMIN_HTML = """
 <!DOCTYPE html>
 <html>
 <head>
