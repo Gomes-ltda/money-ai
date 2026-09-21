@@ -68,29 +68,68 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
             "ciclo_memoria": ciclo
         }
 
-    # Em modo degradado, não propagar uma decisão incompleta para etapas comerciais.
+    # Em modo degradado, o Cérebro não decide uma estratégia nova.
+    # Ainda assim, a EVOLIA pode executar pesquisa factual de prospecção
+    # usando o TinyFish, sem enviar mensagens ou assumir que encontrou um
+    # problema real sem validação pública.
     if decisao_ia.get("status") == "modo_degradado":
         detalhes_degradados = decisao_ia.get("decisao", {}) or {}
+        fallback = {
+            **detalhes_degradados,
+            "estrategia": "prospecção incremental de clientes",
+            "nicho": "prestadores de serviços B2B",
+            "cliente_alvo": "prestadores de serviços B2B",
+            "problema": "dificuldade na captação de clientes B2B e abordagens comerciais genéricas",
+            "oferta": "diagnóstico e melhoria de abordagem comercial com IA",
+            "canal": None,
+            "url_alvo": None,
+            "acao_executor": "pesquisar_alvo",
+            "precisa_permissao": False
+        }
         decisao_degradada = _montar_decisao(
-            detalhes_degradados,
-            detalhes_degradados.get("acao_executor", "pesquisar"),
+            fallback,
+            "pesquisar_alvo",
             objetivo,
             localizacao,
-            "Modo degradado: pesquisa registrada, mas etapas dependentes de decisão estruturada foram interrompidas."
+            "Modo degradado: provedores de IA indisponíveis; executar somente prospecção factual e validação pública."
         )
+
         executor_degradado = Executor()
-        resultado_pesquisa = executor_degradado.executar(decisao_degradada)
+        execucoes_degradadas = []
+        resultado_anterior = None
+
+        for acao in ("pesquisar_alvo", "validar_alvo"):
+            tarefa_decisao = dict(decisao_degradada)
+            tarefa_decisao["acao"] = acao
+            tarefa_decisao["resultado_anterior"] = resultado_anterior
+            try:
+                resultado_tarefa = executor_degradado.executar(tarefa_decisao)
+            except Exception as erro:
+                resultado_tarefa = {"status": "erro", "acao": acao, "erro": str(erro)}
+
+            execucoes_degradadas.append(resultado_tarefa)
+            if resultado_tarefa.get("status") in {"erro", "bloqueado"}:
+                break
+            resultado_anterior = resultado_tarefa
+
+        ultimo_resultado = execucoes_degradadas[-1] if execucoes_degradadas else {}
+        resultado_publico = ultimo_resultado.get("resultado", {}) if isinstance(ultimo_resultado, dict) else {}
         execucao_degradada = {
             "status": "modo_degradado",
-            "acao": decisao_degradada["acao"],
-            "tarefas_planejadas": [],
-            "tarefas_executadas": 1,
-            "execucoes": [resultado_pesquisa]
+            "acao": "pesquisar_alvo",
+            "tarefas_planejadas": [
+                {"acao": "pesquisar_alvo", "descricao": "Encontrar alvos públicos específicos."},
+                {"acao": "validar_alvo", "descricao": "Verificar evidências públicas antes de qualquer abordagem."}
+            ],
+            "tarefas_executadas": len(execucoes_degradadas),
+            "execucoes": execucoes_degradadas
         }
         ciclo = registrar_ciclo(
-            objetivo=objetivo, localizacao=localizacao,
-            pesquisa=resultado_pesquisa.get("resultado", {}).get("resultados") if isinstance(resultado_pesquisa, dict) else None,
-            analise=decisao_ia, decisao=decisao_degradada,
+            objetivo=objetivo,
+            localizacao=localizacao,
+            pesquisa=resultado_publico.get("candidatos") or resultado_publico.get("evidencia"),
+            analise=decisao_ia,
+            decisao=decisao_degradada,
             execucao=execucao_degradada,
             medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "modo_degradado"}
         )
@@ -100,7 +139,7 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
             "localizacao": localizacao,
             "decisao_ia": decisao_ia,
             "decisao": decisao_degradada,
-            "tarefas": [],
+            "tarefas": execucao_degradada["tarefas_planejadas"],
             "execucao": execucao_degradada,
             "medicao": {"receita": 0, "custo": 0, "resultado": 0, "status": "modo_degradado"},
             "ciclo_memoria": ciclo
