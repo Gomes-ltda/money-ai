@@ -32,29 +32,117 @@ ADMIN_HTML = """
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 700px;
-            margin: 40px auto;
-            padding: 20px;
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 28px 18px 50px;
+            color: #111;
+            background: #fff;
         }
-        textarea, input {
+        .topo {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .marca {
+            font-size: 34px;
+            font-weight: 700;
+            margin: 0;
+        }
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #ccc;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        .ponto {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #222;
+        }
+        .subtitulo {
+            color: #555;
+            margin-top: 6px;
+        }
+        .painel-ciclo {
+            border: 1px solid #d4d4d4;
+            border-radius: 14px;
+            padding: 22px;
+            margin-bottom: 24px;
+        }
+        .painel-ciclo h2 {
+            margin: 0 0 8px;
+        }
+        .objetivo-interno {
+            color: #444;
+            margin: 0 0 20px;
+        }
+        .etapas {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 18px 0 22px;
+        }
+        .etapa {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 13px;
+            min-height: 66px;
+        }
+        .etapa strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .etapa span {
+            color: #666;
+            font-size: 13px;
+        }
+        .botao-principal {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid #111;
+            border-radius: 9px;
+            background: #111;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .botao-principal:disabled {
+            opacity: .55;
+            cursor: wait;
+        }
+        #resultado {
+            white-space: pre-wrap;
+            margin-top: 18px;
+            line-height: 1.5;
+        }
+        .info {
+            color: #666;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+        input {
             width: 100%;
             padding: 10px;
             margin-top: 8px;
             box-sizing: border-box;
-        }
-        textarea {
-            height: 120px;
-            resize: vertical;
         }
         button {
             margin-top: 12px;
             padding: 12px 20px;
             cursor: pointer;
         }
-        #resultado {
-            white-space: pre-wrap;
-            margin-top: 20px;
-            line-height: 1.5;
+        @media (max-width: 620px) {
+            .topo { align-items: flex-start; flex-direction: column; }
+            .etapas { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 420px) {
+            .etapas { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -68,24 +156,31 @@ ADMIN_HTML = """
         <div id="loginStatus" style="margin-top:12px"></div>
     </div>
     <div id="painel" style="display:none">
-    <h1>Evolia AI</h1>
-    <p>Objetivo atual da Evolia:</p>
+    <div class="topo">
+        <div>
+            <h1 class="marca">Evolia AI</h1>
+            <div class="subtitulo">Painel de operação e acompanhamento</div>
+        </div>
+        <div class="status"><span class="ponto"></span><span id="statusGeral">Pronta</span></div>
+    </div>
 
-    <textarea id="objetivo"
-        placeholder="Ex.: Encontrar uma oportunidade de negócio online"></textarea>
-
-    <p>Localização:</p>
-
-    <input id="localizacao" type="text"
-        placeholder="Ex.: Brasil">
-
-    <br>
-
-    <button onclick="executarCiclo()">
-        Executar ciclo da Evolia
-    </button>
-
-    <div id="resultado"></div>
+    <section class="painel-ciclo">
+        <h2>Ciclo da Evolia</h2>
+        <p class="objetivo-interno">
+            A Evolia trabalha para identificar, testar e melhorar formas legítimas de geração de receita.
+        </p>
+        <div class="etapas">
+            <div class="etapa"><strong>1. Observar</strong><span>Coleta contexto e sinais relevantes.</span></div>
+            <div class="etapa"><strong>2. Pesquisar</strong><span>Busca oportunidades e informações atuais.</span></div>
+            <div class="etapa"><strong>3. Analisar</strong><span>Compara viabilidade, esforço e retorno.</span></div>
+            <div class="etapa"><strong>4. Decidir</strong><span>Seleciona o próximo experimento.</span></div>
+            <div class="etapa"><strong>5. Executar</strong><span>Prepara ou executa ações autorizadas.</span></div>
+            <div class="etapa"><strong>6. Aprender</strong><span>Registra resultados e ajusta o próximo ciclo.</span></div>
+        </div>
+        <button id="botaoCiclo" class="botao-principal" onclick="executarCiclo()">Iniciar ciclo agora</button>
+        <div class="info">Localização e outros dados de contexto são definidos pela operação quando forem necessários.</div>
+        <div id="resultado"></div>
+    </section>
     <hr>
     <h2>Ações externas pendentes</h2>
     <p>Estas ações foram preparadas pela Evolia e aguardam sua autorização.</p>
@@ -143,37 +238,35 @@ ADMIN_HTML = """
         }
 
         async function executarCiclo() {
-            const objetivo = document.getElementById("objetivo").value;
-            const localizacao = document.getElementById("localizacao").value;
             const resultado = document.getElementById("resultado");
+            const botao = document.getElementById("botaoCiclo");
+            const statusGeral = document.getElementById("statusGeral");
 
-            if (!objetivo.trim()) {
-                resultado.textContent = "Digite um objetivo.";
-                return;
-            }
-
-            if (!localizacao.trim()) {
-                resultado.textContent = "Informe a localização.";
-                return;
-            }
-
-            resultado.textContent = "Evolia executando ciclo...";
+            resultado.textContent = "Iniciando ciclo: observando, pesquisando e analisando...";
+            statusGeral.textContent = "Executando";
+            botao.disabled = true;
 
             try {
                 const resposta = await fetch("/ciclo", {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({
-                        objetivo: objetivo,
-                        localizacao: localizacao
-                    })
+                    body: JSON.stringify({})
                 });
 
                 const dados = await resposta.json();
+                if (!resposta.ok) {
+                    resultado.textContent = dados.erro || "Erro ao executar ciclo.";
+                    statusGeral.textContent = "Erro";
+                    return;
+                }
 
                 resultado.textContent = JSON.stringify(dados, null, 2);
+                statusGeral.textContent = "Ciclo concluído";
             } catch (erro) {
-                resultado.textContent = "Erro: " + erro;
+                resultado.textContent = "Erro de conexão com a Evolia.";
+                statusGeral.textContent = "Erro";
+            } finally {
+                botao.disabled = false;
             }
         }
         function obterToken() {
@@ -645,18 +738,15 @@ def ciclo():
     dados = request.get_json(silent=True) or {}
 
     objetivo = str(
-        dados.get("objetivo", "Gerar receita")
-    ).strip()
+        dados.get(
+            "objetivo",
+            "Gerar receita de forma legítima e sustentável"
+        )
+    ).strip() or "Gerar receita de forma legítima e sustentável"
 
     localizacao = str(
         dados.get("localizacao", "Brasil")
-    ).strip()
-
-    if not objetivo:
-        return jsonify({"erro": "Informe um objetivo."}), 400
-
-    if not localizacao:
-        return jsonify({"erro": "Informe a localização."}), 400
+    ).strip() or "Brasil"
 
     try:
         resultado = executar_ciclo(
