@@ -104,6 +104,78 @@ def criar_cobranca_pix(valor, descricao, referencia=None, email=None, acao_id=No
         return {"status": "erro", "erro": str(erro)}
 
 
+def criar_order_pix_teste():
+    """Cria a order Pix predefinida do sandbox do Mercado Pago.
+    O sandbox usa um cenário determinístico e não movimenta dinheiro real.
+    """
+    if not MP_ACCESS_TOKEN:
+        return {"status": "aguardando_configuracao", "erro": "MERCADOPAGO_ACCESS_TOKEN não configurado."}
+
+    referencia = "evolia-teste-" + uuid.uuid4().hex[:24]
+    payload = {
+        "type": "online",
+        "external_reference": referencia,
+        "total_amount": "50.00",
+        "payer": {
+            "email": "test_user_br@testuser.com",
+            "first_name": "APRO"
+        },
+        "transactions": {
+            "payments": [{
+                "amount": "50.00",
+                "payment_method": {
+                    "id": "pix",
+                    "type": "bank_transfer"
+                }
+            }]
+        }
+    }
+
+    try:
+        resposta = requests.post(
+            f"{MP_API}/v1/orders",
+            headers={
+                "Authorization": f"Bearer {MP_ACCESS_TOKEN}",
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": referencia
+            },
+            json=payload,
+            timeout=30
+        )
+        dados = resposta.json()
+        if not resposta.ok:
+            return {"status": "erro", "codigo": resposta.status_code, "detalhes": dados}
+
+        transactions = (dados.get("transactions") or {}).get("payments") or []
+        method = (transactions[0].get("payment_method") or {}) if transactions else {}
+
+        pagamento = {
+            "id": str(dados.get("id")),
+            "provedor": "mercado_pago",
+            "tipo": "pix",
+            "status": "aguardando_pagamento",
+            "status_detail": "waiting_transfer",
+            "valor": 50.0,
+            "descricao": "Teste Pix sandbox Evolia",
+            "referencia": referencia,
+            "email_comprador": "test_user_br@testuser.com",
+            "acao_id": None,
+            "teste_sandbox": True,
+            "criado_em": agora(),
+            "ticket_url": method.get("ticket_url"),
+            "qr_code": method.get("qr_code")
+        }
+        registrar_pagamento(pagamento)
+        return {
+            "status": "criado",
+            "mensagem": "Order Pix de teste criada no sandbox.",
+            "pagamento": pagamento,
+            "order": dados
+        }
+    except Exception as erro:
+        return {"status": "erro", "erro": str(erro)}
+
+
 def consultar_order(order_id):
     if not MP_ACCESS_TOKEN or not order_id:
         return None
