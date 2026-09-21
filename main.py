@@ -352,9 +352,42 @@ ADMIN_HTML = """
 """
 
 
+PUBLIC_HTML = """
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Evolia AI — serviços digitais rápidos e sob medida.">
+<title>Evolia AI — Serviços digitais</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#111;background:#f7f7f7;line-height:1.5}.wrap{max-width:1050px;margin:auto;padding:0 20px}header{background:#111;color:#fff;padding:22px 0}header .wrap{display:flex;justify-content:space-between;align-items:center;gap:20px}.logo{font-size:24px;font-weight:700}.nav a{color:#fff;text-decoration:none;margin-left:18px}.hero{padding:75px 0 60px;background:#fff}.hero h1{font-size:46px;line-height:1.05;margin:0 0 20px;max-width:720px}.hero p{font-size:20px;max-width:700px;color:#555}.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;padding:13px 20px;border-radius:8px;margin-top:12px}section{padding:55px 0}h2{font-size:30px;margin-top:0}.grid,.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.card,.step{background:#fff;border:1px solid #ddd;border-radius:12px;padding:24px}.card h3{margin-top:0}.price{font-size:20px;font-weight:700}footer{background:#111;color:#aaa;padding:28px 0}footer a{color:#fff}@media(max-width:700px){.hero h1{font-size:36px}.grid,.steps{grid-template-columns:1fr}header .wrap{align-items:flex-start}.nav a{margin-left:10px}}
+</style></head>
+<body>
+<header><div class="wrap"><div class="logo">Evolia AI</div><div class="nav"><a href="#servicos">Serviços</a><a href="#como-funciona">Como funciona</a><a href="/painel">Painel</a></div></div></header>
+<main>
+<section class="hero"><div class="wrap"><h1>Serviços digitais feitos para resolver problemas reais.</h1><p>A Evolia identifica necessidades, prepara soluções objetivas e organiza cada oportunidade de forma estruturada.</p><a class="btn" href="#servicos">Conhecer serviços</a></div></section>
+<section id="servicos"><div class="wrap"><h2>Serviços</h2><div class="grid">
+<div class="card"><h3>Textos comerciais</h3><p>Mensagens de abordagem, respostas a clientes, propostas e roteiros de venda.</p><div class="price">Sob orçamento</div></div>
+<div class="card"><h3>Pesquisa e organização</h3><p>Levantamento de informações, organização de dados e síntese de conteúdo.</p><div class="price">Sob orçamento</div></div>
+<div class="card"><h3>Solução sob medida</h3><p>Descreva seu problema e avaliamos um serviço específico para sua necessidade.</p><div class="price">Sob orçamento</div></div>
+</div></div></section>
+<section id="como-funciona"><div class="wrap"><h2>Como funciona</h2><div class="steps">
+<div class="step"><strong>1. Você explica</strong><p>Conte o que precisa resolver e o resultado esperado.</p></div>
+<div class="step"><strong>2. A Evolia avalia</strong><p>Montamos uma proposta com escopo e preço antes da execução.</p></div>
+<div class="step"><strong>3. Entregamos</strong><p>Após a confirmação, o serviço é executado e o resultado é registrado.</p></div>
+</div></div></section>
+<section><div class="wrap"><div class="card"><h2>Precisa de algo específico?</h2><p>Envie uma descrição do problema para avaliarmos uma solução.</p><a class="btn" href="mailto:contato@evolia.ai">Entrar em contato</a></div></div></section>
+</main><footer><div class="wrap">Evolia AI · <a href="/painel">Acesso administrativo</a></div></footer>
+</body></html>
+"""
+
 @app.route("/")
 def home():
-    return render_template_string(HTML)
+    return render_template_string(PUBLIC_HTML)
+
+
+@app.route("/painel")
+def painel():
+    return render_template_string(ADMIN_HTML)
 
 
 @app.route("/painel-login", methods=["POST"])
