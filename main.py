@@ -134,21 +134,12 @@ HTML = """
             }
         }
 
-        async function validarSessaoPainel() {
-            const token = sessionStorage.getItem("evolia_token") || "";
-            if (!token) return false;
-            try {
-                const resposta = await fetch("/painel-status", {
-                    headers: {"Authorization": "Bearer " + token}
-                });
-                if (!resposta.ok) return false;
-                document.getElementById("loginPainel").style.display = "none";
-                document.getElementById("painel").style.display = "block";
-                document.getElementById("tokenAutorizacao").value = token;
-                return true;
-            } catch (erro) {
-                return false;
-            }
+        function sairPainel() {
+            sessionStorage.removeItem("evolia_token");
+            document.getElementById("painel").style.display = "none";
+            document.getElementById("loginPainel").style.display = "block";
+            document.getElementById("senhaPainel").value = "";
+            document.getElementById("loginStatus").textContent = "";
         }
 
         async function executarCiclo() {
@@ -349,10 +340,10 @@ HTML = """
                 }, 10000);
             }
         }
-        window.addEventListener("load", async function() {
-            if (await validarSessaoPainel()) {
-                iniciarAtualizacaoAutomatica();
-            }
+        window.addEventListener("load", function() {
+            sessionStorage.removeItem("evolia_token");
+            document.getElementById("loginPainel").style.display = "block";
+            document.getElementById("painel").style.display = "none";
         });
         document.getElementById("tokenAutorizacao").addEventListener("change", iniciarAtualizacaoAutomatica);
     </script>
