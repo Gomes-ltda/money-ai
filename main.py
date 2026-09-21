@@ -6,7 +6,7 @@ from agent import executar_ciclo
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
 from pagamentos import criar_cobranca_pix, criar_order_pix_teste, validar_webhook, processar_webhook, sincronizar_pagamento
-from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca, obter_pagamento_por_id
+from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca, obter_pagamento_por_id, registrar_pedido_cliente, obter_pedidos_clientes, obter_pedido_publico, atualizar_pedido_cliente
 
 
 app = Flask(__name__)
@@ -100,6 +100,10 @@ ADMIN_HTML = """
     <p>Use este painel para registrar o que aconteceu depois de uma abordagem executada.</p>
     <div id="historicoAcoes"></div>
     <hr>
+    <h2>Pedidos de clientes</h2>
+    <p>Solicitações recebidas pelo site principal. Analise, envie proposta e publique a entrega por aqui.</p>
+    <div id="pedidosClientes"></div>
+<hr>
     <h2>Pagamentos</h2>
     <div id="pagamentos"></div>
     <button onclick="criarTestePix()">Criar teste Pix (sandbox)</button>
@@ -326,11 +330,49 @@ ADMIN_HTML = """
                     "</p>";
             } catch (erro) {}
         }
+        async function carregarPedidosClientes() {
+            const box = document.getElementById("pedidosClientes");
+            const token = obterToken();
+            if (!token) return;
+            try {
+                const resposta = await fetch("/pedidos-clientes", {headers: {"Authorization": "Bearer " + token}});
+                const dados = await resposta.json();
+                if (!resposta.ok) return;
+                const pedidos = (dados.pedidos || []).slice().reverse();
+                if (!pedidos.length) { box.innerHTML = "<p>Nenhum pedido recebido ainda.</p>"; return; }
+                box.innerHTML = pedidos.slice(0,20).map(p => {
+                    const prop = p.proposta || {}, ent = p.entrega || {};
+                    const esc = x => String(x || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+                    return "<div style='border:1px solid #ccc;padding:16px;margin:12px 0;border-radius:10px'>" +
+                    "<b>"+esc(p.nome)+"</b> · "+esc(p.status)+(p.modo_teste?" · TESTE":"")+
+                    "<p><b>Serviço:</b> "+esc(p.servico)+"<br><b>Contato:</b> "+esc(p.email || p.whatsapp || p.instagram || "-")+
+                    "<br><b>Pedido:</b> "+esc(p.descricao)+"</p>"+
+                    "<label>Status</label><select id='st-"+p.id+"'>"+
+                    ["recebido","em_analise","proposta_enviada","aguardando_pagamento","em_execucao","entregue","cancelado"].map(st=>"<option "+(p.status===st?"selected":"")+">"+st+"</option>").join("")+
+                    "</select><label>Proposta</label><textarea id='pt-"+p.id+"' placeholder='Escopo e condições'>"+esc(prop.texto)+"</textarea>"+
+                    "<label>Valor</label><input id='pv-"+p.id+"' type='number' min='0' step='0.01' value='"+esc(prop.valor)+"'>"+
+                    "<label>Prazo</label><input id='pp-"+p.id+"' value='"+esc(prop.prazo)+"' placeholder='Ex.: 3 dias úteis'>"+
+                    "<label>Entrega</label><textarea id='et-"+p.id+"' placeholder='Resultado entregue ao cliente'>"+esc(ent.texto)+"</textarea>"+
+                    "<label>Link da entrega (opcional)</label><input id='eu-"+p.id+"' value='"+esc(ent.url)+"' placeholder='https://...'>"+
+                    "<button onclick='salvarPedidoCliente(""+p.id+"")'>Salvar / publicar</button> <a href='/pedido/"+encodeURIComponent(p.token_publico)+"' target='_blank'>Abrir página do cliente</a></div>";
+                }).join("");
+            } catch(e) {}
+        }
+        async function salvarPedidoCliente(id) {
+            const token=obterToken();
+            const proposta={texto:document.getElementById("pt-"+id).value,valor:document.getElementById("pv-"+id).value?Number(document.getElementById("pv-"+id).value):null,prazo:document.getElementById("pp-"+id).value};
+            const entrega={texto:document.getElementById("et-"+id).value,url:document.getElementById("eu-"+id).value};
+            const resposta=await fetch("/pedidos-clientes/"+encodeURIComponent(id),{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({status:document.getElementById("st-"+id).value,proposta:proposta,entrega:entrega,observacao:"Atualização pelo painel."})});
+            const dados=await resposta.json();
+            if(!resposta.ok){alert(dados.erro||"Não foi possível atualizar o pedido.");return;}
+            carregarPedidosClientes();
+        }
         let intervaloAcoes = null;
         function iniciarAtualizacaoAutomatica() {
             if (intervaloAcoes) clearInterval(intervaloAcoes);
             if (obterToken()) {
                 carregarAcoes();
+                carregarPedidosClientes();
                 carregarAcoesEmAndamento();
                 carregarHistorico();
                 sincronizarPagamentosAutomaticamente();
@@ -338,6 +380,7 @@ ADMIN_HTML = """
                 intervaloAcoes = setInterval(() => {
                     if (obterToken()) {
                         carregarAcoes();
+                        carregarPedidosClientes();
                         carregarAcoesEmAndamento();
                         carregarHistorico();
                         sincronizarPagamentosAutomaticamente();
@@ -360,31 +403,217 @@ ADMIN_HTML = """
 
 PUBLIC_HTML = """
 <!DOCTYPE html>
-<html lang="pt-BR"><head>
+<html lang="pt-BR">
+<head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Evolia AI — serviços digitais rápidos e sob medida.">
+<meta name="description" content="Evolia AI — serviços digitais sob medida.">
 <title>Evolia AI — Serviços digitais</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#111;background:#f7f7f7;line-height:1.5}.wrap{max-width:1050px;margin:auto;padding:0 20px}header{background:#111;color:#fff;padding:22px 0}header .wrap{display:flex;justify-content:space-between;align-items:center;gap:20px}.logo{font-size:24px;font-weight:700}.nav a{color:#fff;text-decoration:none;margin-left:18px}.hero{padding:75px 0 60px;background:#fff}.hero h1{font-size:46px;line-height:1.05;margin:0 0 20px;max-width:720px}.hero p{font-size:20px;max-width:700px;color:#555}.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;padding:13px 20px;border-radius:8px;margin-top:12px}section{padding:55px 0}h2{font-size:30px;margin-top:0}.grid,.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.card,.step{background:#fff;border:1px solid #ddd;border-radius:12px;padding:24px}.card h3{margin-top:0}.price{font-size:20px;font-weight:700}footer{background:#111;color:#aaa;padding:28px 0}footer a{color:#fff}@media(max-width:700px){.hero h1{font-size:36px}.grid,.steps{grid-template-columns:1fr}header .wrap{align-items:flex-start}.nav a{margin-left:10px}}
-</style></head>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;color:#111;background:#f6f7f9;line-height:1.55}
+.wrap{max-width:1100px;margin:auto;padding:0 20px}
+header{background:#111;color:#fff;padding:18px 0}
+header .wrap{display:flex;justify-content:space-between;align-items:center;gap:20px}
+.logo{font-size:24px;font-weight:800}
+.nav a{color:#fff;text-decoration:none;margin-left:18px;font-size:14px}
+.hero{padding:78px 0 68px;background:#fff}
+.eyebrow{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#666}
+.hero h1{font-size:clamp(38px,6vw,64px);line-height:1.02;letter-spacing:-2px;margin:14px 0 20px;max-width:780px}
+.hero p{font-size:19px;max-width:720px;color:#555;margin:0 0 24px}
+.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;padding:14px 21px;border-radius:10px;font-weight:700;border:0;cursor:pointer}
+.btn.sec{background:#fff;color:#111;border:1px solid #ccc}
+section{padding:64px 0}
+h2{font-size:32px;letter-spacing:-.7px;margin:0 0 12px}
+.section-intro{color:#666;max-width:700px;margin:0 0 28px}
+.grid,.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.card,.step,.form-card{background:#fff;border:1px solid #e1e2e5;border-radius:18px;padding:25px;box-shadow:0 8px 30px rgba(0,0,0,.04)}
+.card h3{margin-top:0;font-size:20px}
+.card p,.step p{color:#666}
+.price{font-size:14px;font-weight:700;margin-top:20px}
+.form-card{max-width:760px}
+label{display:block;font-weight:700;font-size:14px;margin:16px 0 7px}
+input,textarea,select{width:100%;padding:13px;border:1px solid #ccc;border-radius:10px;font:inherit;background:#fff}
+textarea{min-height:130px;resize:vertical}
+.small{font-size:13px;color:#777}
+.result{margin-top:16px;padding:16px;border-radius:12px;background:#f1f2f4}
+.cta{background:#111;color:#fff;border-radius:22px;padding:36px}
+.cta p{color:#ccc}
+footer{background:#111;color:#aaa;padding:30px 0}
+@media(max-width:760px){.grid,.steps{grid-template-columns:1fr}header .wrap{align-items:flex-start}.nav a{margin-left:10px}.hero{padding-top:58px}}
+</style>
+</head>
 <body>
-<header><div class="wrap"><div class="logo">Evolia AI</div><div class="nav"><a href="#servicos">Serviços</a><a href="#como-funciona">Como funciona</a><a href="/painel">Painel</a></div></div></header>
+<header><div class="wrap"><div class="logo">Evolia AI</div><nav class="nav"><a href="#servicos">Serviços</a><a href="#como-funciona">Como funciona</a><a href="#solicitar">Solicitar</a></nav></div></header>
 <main>
-<section class="hero"><div class="wrap"><h1>Serviços digitais feitos para resolver problemas reais.</h1><p>A Evolia identifica necessidades, prepara soluções objetivas e organiza cada oportunidade de forma estruturada.</p><a class="btn" href="#servicos">Conhecer serviços</a></div></section>
-<section id="servicos"><div class="wrap"><h2>Serviços</h2><div class="grid">
-<div class="card"><h3>Textos comerciais</h3><p>Mensagens de abordagem, respostas a clientes, propostas e roteiros de venda.</p><div class="price">Sob orçamento</div></div>
+<section class="hero"><div class="wrap">
+<div class="eyebrow">Serviços digitais sob medida</div>
+<h1>Você explica o problema. A Evolia organiza a solução.</h1>
+<p>Solicite um serviço, explique o que precisa e receba uma proposta antes da execução. Nesta fase, o site também pode ser usado para testes reais.</p>
+<a class="btn" href="#solicitar">Solicitar orçamento</a>
+</div></section>
+<section id="servicos"><div class="wrap">
+<h2>O que podemos fazer</h2>
+<p class="section-intro">Serviços pensados para demandas práticas de comunicação, pesquisa e organização digital.</p>
+<div class="grid">
+<div class="card"><h3>Textos comerciais</h3><p>Mensagens de abordagem, propostas, respostas a clientes e roteiros de conversão.</p><div class="price">Sob orçamento</div></div>
 <div class="card"><h3>Pesquisa e organização</h3><p>Levantamento de informações, organização de dados e síntese de conteúdo.</p><div class="price">Sob orçamento</div></div>
-<div class="card"><h3>Solução sob medida</h3><p>Descreva seu problema e avaliamos um serviço específico para sua necessidade.</p><div class="price">Sob orçamento</div></div>
+<div class="card"><h3>Solução sob medida</h3><p>Descreva uma necessidade específica e avaliamos o que pode ser entregue.</p><div class="price">Sob orçamento</div></div>
 </div></div></section>
-<section id="como-funciona"><div class="wrap"><h2>Como funciona</h2><div class="steps">
-<div class="step"><strong>1. Você explica</strong><p>Conte o que precisa resolver e o resultado esperado.</p></div>
-<div class="step"><strong>2. A Evolia avalia</strong><p>Montamos uma proposta com escopo e preço antes da execução.</p></div>
-<div class="step"><strong>3. Entregamos</strong><p>Após a confirmação, o serviço é executado e o resultado é registrado.</p></div>
+<section id="como-funciona"><div class="wrap">
+<h2>Como funciona</h2>
+<div class="steps">
+<div class="step"><strong>1. Você solicita</strong><p>Explique o que precisa e informe um meio de contato.</p></div>
+<div class="step"><strong>2. Avaliamos</strong><p>Organizamos o pedido e definimos escopo, prazo e preço.</p></div>
+<div class="step"><strong>3. Entregamos</strong><p>Após a confirmação, o resultado fica disponível para você pelo próprio site.</p></div>
 </div></div></section>
-<section><div class="wrap"><div class="card"><h2>Precisa de algo específico?</h2><p>Envie uma descrição do problema para avaliarmos uma solução.</p><a class="btn" href="mailto:contato@evolia.ai">Entrar em contato</a></div></div></section>
-</main><footer><div class="wrap">Evolia AI · <a href="/painel">Acesso administrativo</a></div></footer>
-</body></html>
+<section id="solicitar"><div class="wrap">
+<div class="form-card">
+<h2>Solicitar orçamento</h2>
+<p class="section-intro">Preencha o formulário. Ao enviar, você receberá um link privado para acompanhar o pedido.</p>
+<form id="pedidoForm" onsubmit="enviarPedido(event)">
+<label>Nome</label><input id="nome" required maxlength="100" placeholder="Seu nome ou empresa">
+<label>E-mail</label><input id="email" type="email" maxlength="160" placeholder="voce@exemplo.com">
+<label>WhatsApp</label><input id="whatsapp" maxlength="30" placeholder="(00) 00000-0000">
+<label>Instagram (opcional)</label><input id="instagram" maxlength="80" placeholder="@seuusuario">
+<label>O que você precisa?</label>
+<select id="servico" required><option value="">Selecione</option><option>Textos comerciais</option><option>Pesquisa e organização</option><option>Solução sob medida</option><option>Outro</option></select>
+<label>Descreva o pedido</label><textarea id="descricao" required maxlength="4000" placeholder="Explique o que você precisa e qual resultado espera."></textarea>
+<p class="small">Não envie senhas, documentos sensíveis ou dados bancários pelo formulário.</p>
+<button class="btn" type="submit">Enviar solicitação</button>
+</form>
+<div id="pedidoResultado"></div>
+</div></div></section>
+<section><div class="wrap"><div class="cta">
+<h2>Quer testar a operação?</h2><p>Faça uma solicitação real e acompanhe o atendimento pelo link gerado após o envio.</p>
+<a class="btn sec" href="#solicitar">Fazer um teste</a>
+</div></div></section>
+</main>
+<footer><div class="wrap">Evolia AI · Serviços digitais</div></footer>
+<script>
+async function enviarPedido(event){
+ event.preventDefault();
+ const box=document.getElementById("pedidoResultado");
+ box.className="result"; box.textContent="Enviando solicitação...";
+ const contato=(document.getElementById("email").value+" "+document.getElementById("whatsapp").value+" "+document.getElementById("instagram").value).trim();
+ if(!contato){box.textContent="Informe pelo menos um meio de contato.";return;}
+ try{
+  const r=await fetch("/solicitar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+   nome:document.getElementById("nome").value,email:document.getElementById("email").value,
+   whatsapp:document.getElementById("whatsapp").value,instagram:document.getElementById("instagram").value,
+   servico:document.getElementById("servico").value,descricao:document.getElementById("descricao").value,modo_teste:true
+  })});
+  const d=await r.json();
+  if(!r.ok){box.textContent=d.erro||"Não foi possível enviar o pedido.";return;}
+  box.innerHTML="<strong>Pedido recebido.</strong><p>Guarde este link para acompanhar o atendimento:</p><p><a href='"+d.url_publica+"'>"+d.url_publica+"</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
+  document.getElementById("pedidoForm").reset();
+ }catch(e){box.textContent="Erro de conexão. Tente novamente.";}
+}
+</script>
+</body>
+</html>
 """
+"""
+
+
+
+@app.route("/solicitar", methods=["POST"])
+def solicitar():
+    dados = request.get_json(silent=True) or {}
+    nome = str(dados.get("nome", "")).strip()
+    email = str(dados.get("email", "")).strip()
+    whatsapp = str(dados.get("whatsapp", "")).strip()
+    instagram = str(dados.get("instagram", "")).strip()
+    servico = str(dados.get("servico", "")).strip()
+    descricao = str(dados.get("descricao", "")).strip()
+
+    if not nome:
+        return jsonify({"erro": "Informe seu nome ou empresa."}), 400
+    if not servico:
+        return jsonify({"erro": "Selecione um serviço."}), 400
+    if not descricao:
+        return jsonify({"erro": "Descreva o que você precisa."}), 400
+    if not any([email, whatsapp, instagram]):
+        return jsonify({"erro": "Informe pelo menos um meio de contato."}), 400
+    if email and ("@" not in email or "." not in email.split("@")[-1]):
+        return jsonify({"erro": "Informe um e-mail válido."}), 400
+
+    pedido = registrar_pedido_cliente(
+        nome=nome, email=email, whatsapp=whatsapp, instagram=instagram,
+        servico=servico, descricao=descricao, modo_teste=bool(dados.get("modo_teste", True))
+    )
+    return jsonify({
+        "status": "recebido",
+        "pedido_id": pedido["id"],
+        "url_publica": request.host_url.rstrip("/") + "/pedido/" + pedido["token_publico"]
+    }), 201
+
+
+@app.route("/pedido/<token>")
+def pedido_publico(token):
+    pedido = obter_pedido_publico(token)
+    if not pedido:
+        return "<!doctype html><html lang='pt-BR'><meta name='viewport' content='width=device-width,initial-scale=1'><body style='font-family:Arial;max-width:700px;margin:60px auto;padding:20px'><h1>Pedido não encontrado</h1><p>Verifique o link recebido.</p></body></html>", 404
+
+    status = pedido.get("status", "recebido")
+    labels = {
+        "recebido":"Solicitação recebida","em_analise":"Em análise",
+        "proposta_enviada":"Proposta disponível","aguardando_pagamento":"Aguardando confirmação",
+        "em_execucao":"Em execução","entregue":"Entrega disponível","cancelado":"Pedido encerrado"
+    }
+    proposta = pedido.get("proposta") or {}
+    entrega = pedido.get("entrega") or {}
+    proposta_html = ""
+    if proposta.get("texto"):
+        texto = str(proposta.get("texto","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\n","<br>")
+        proposta_html = "<div style='background:#f5f6f8;border-radius:14px;padding:18px;margin-top:20px'><h2>Proposta</h2><p>"+texto+"</p>"
+        if proposta.get("valor") is not None:
+            proposta_html += "<p><strong>Valor:</strong> R$ "+str(proposta.get("valor"))+"</p>"
+        if proposta.get("prazo"):
+            proposta_html += "<p><strong>Prazo:</strong> "+str(proposta.get("prazo"))+"</p>"
+        proposta_html += "</div>"
+    entrega_html = ""
+    if entrega.get("texto"):
+        texto = str(entrega.get("texto","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+        entrega_html = "<div style='background:#eef7f0;border-radius:14px;padding:18px;margin-top:20px'><h2>Entrega</h2><div style='white-space:pre-wrap'>"+texto+"</div>"
+        if entrega.get("url"):
+            entrega_html += "<p><a href='"+str(entrega.get("url"))+"' target='_blank' rel='noopener'>Abrir resultado</a></p>"
+        entrega_html += "</div>"
+
+    nome_seguro=str(pedido.get("nome","")).replace("<","&lt;").replace(">","&gt;")
+    servico_seguro=str(pedido.get("servico","")).replace("<","&lt;").replace(">","&gt;")
+    return """<!doctype html><html lang='pt-BR'><head><meta name='viewport' content='width=device-width,initial-scale=1'><title>Evolia AI — Pedido</title></head>
+<body style='margin:0;background:#f5f6f8;font-family:Arial,sans-serif;color:#111'><main style='max-width:760px;margin:0 auto;padding:40px 20px'>
+<div style='background:#111;color:#fff;border-radius:18px;padding:24px'><strong style='font-size:24px'>Evolia AI</strong><p style='margin-bottom:0'>Acompanhamento do pedido</p></div>
+<div style='background:#fff;border:1px solid #ddd;border-radius:18px;padding:24px;margin-top:18px'><p style='color:#666'>Olá, """ + nome_seguro + """."</p><h1 style='font-size:30px'>""" + labels.get(status,status) + """</h1><p><strong>Serviço:</strong> """ + servico_seguro + """</p>""" + proposta_html + entrega_html + """<p style='color:#777;font-size:13px;margin-top:28px'>Este link é privado. Não compartilhe.</p></div></main></body></html>"""
+
+
+@app.route("/pedidos-clientes")
+def pedidos_clientes():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    return jsonify({"pedidos": obter_pedidos_clientes()})
+
+
+@app.route("/pedidos-clientes/<pedido_id>", methods=["POST"])
+def atualizar_pedido(pedido_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    dados = request.get_json(silent=True) or {}
+    status = str(dados.get("status", "")).strip() or None
+    permitidos = {"recebido","em_analise","proposta_enviada","aguardando_pagamento","em_execucao","entregue","cancelado"}
+    if status and status not in permitidos:
+        return jsonify({"erro": "Status inválido."}), 400
+    proposta = dados.get("proposta")
+    entrega = dados.get("entrega")
+    pedido = atualizar_pedido_cliente(
+        pedido_id, status=status,
+        proposta=proposta if isinstance(proposta, dict) else None,
+        entrega=entrega if isinstance(entrega, dict) else None,
+        observacao=dados.get("observacao")
+    )
+    if not pedido:
+        return jsonify({"erro": "Pedido não encontrado."}), 404
+    return jsonify({"status": "atualizado", "pedido": pedido})
 
 @app.route("/")
 def home():
