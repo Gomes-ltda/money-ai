@@ -358,6 +358,15 @@ class Executor:
             return {"status": "bloqueado", "acao": "preparar_abordagem", "motivo": "Canal externo não suportado ou não definido."}
         if not url_alvo.startswith(("https://", "http://")):
             return {"status": "bloqueado", "acao": "preparar_abordagem", "motivo": "URL pública específica do alvo não foi definida."}
+        if isinstance(anterior, dict) and anterior.get("acao") == "validar_alvo":
+            validacao = anterior.get("resultado", {}) or {}
+            if not validacao.get("validado"):
+                return {
+                    "status": "bloqueado",
+                    "acao": "preparar_abordagem",
+                    "motivo": "A abordagem foi bloqueada porque o alvo nao apresentou evidencia publica suficiente do problema."
+                }
+
         problema = (decisao.get("problema") or "").strip()
         oferta = (decisao.get("oferta") or "").strip()
         if not problema or not oferta or cliente == "cliente potencial":
