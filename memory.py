@@ -23,6 +23,7 @@ def memoria_padrao():
         "aprendizados": [],
         "acoes_externas": [],
         "pagamentos": [],
+        "pedidos_clientes": [],
         "financeiro": {
             "receita": 0,
             "custos": 0
@@ -51,6 +52,9 @@ def garantir_estrutura(memoria):
 
     if not isinstance(memoria.get("pagamentos"), list):
         memoria["pagamentos"] = []
+
+    if not isinstance(memoria.get("pedidos_clientes"), list):
+        memoria["pedidos_clientes"] = []
 
     return memoria
 
@@ -333,6 +337,74 @@ def validar_venda_para_cobranca(acao_id):
     return {"ok": False, "motivo": "Ação externa não encontrada."}
 
 
+
+
+def registrar_pedido_cliente(nome, email=None, whatsapp=None, instagram=None, servico=None, descricao=None, modo_teste=True):
+    import secrets
+    import uuid
+    memoria = carregar_memoria()
+    pedido = {
+        "id": uuid.uuid4().hex,
+        "token_publico": secrets.token_urlsafe(24),
+        "criado_em": agora(),
+        "atualizado_em": agora(),
+        "nome": str(nome or "").strip(),
+        "email": str(email or "").strip().lower(),
+        "whatsapp": str(whatsapp or "").strip(),
+        "instagram": str(instagram or "").strip(),
+        "servico": str(servico or "").strip(),
+        "descricao": str(descricao or "").strip(),
+        "modo_teste": bool(modo_teste),
+        "status": "recebido",
+        "proposta": None,
+        "entrega": None,
+        "historico": [{"data": agora(), "status": "recebido", "observacao": "Solicitação recebida pelo site."}]
+    }
+    memoria["pedidos_clientes"].append(pedido)
+    salvar_memoria(memoria)
+    return pedido
+
+
+def obter_pedidos_clientes(limite=100):
+    return carregar_memoria()["pedidos_clientes"][-limite:]
+
+
+def obter_pedido_publico(token):
+    token = str(token or "").strip()
+    if not token:
+        return None
+    for pedido in reversed(carregar_memoria()["pedidos_clientes"]):
+        if pedido.get("token_publico") == token:
+            return pedido
+    return None
+
+
+def obter_pedido_cliente(pedido_id):
+    for pedido in reversed(carregar_memoria()["pedidos_clientes"]):
+        if pedido.get("id") == pedido_id:
+            return pedido
+    return None
+
+
+def atualizar_pedido_cliente(pedido_id, status=None, proposta=None, entrega=None, observacao=None):
+    memoria = carregar_memoria()
+    for pedido in reversed(memoria["pedidos_clientes"]):
+        if pedido.get("id") == pedido_id:
+            if status is not None:
+                pedido["status"] = str(status).strip()
+            if proposta is not None:
+                pedido["proposta"] = proposta
+            if entrega is not None:
+                pedido["entrega"] = entrega
+            pedido["atualizado_em"] = agora()
+            pedido.setdefault("historico", []).append({
+                "data": agora(),
+                "status": pedido.get("status"),
+                "observacao": str(observacao or "").strip() or None
+            })
+            salvar_memoria(memoria)
+            return pedido
+    return None
 
 def obter_pagamento_por_id(pagamento_id):
     memoria = carregar_memoria()
