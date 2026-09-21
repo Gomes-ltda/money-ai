@@ -215,9 +215,41 @@ class Executor:
             if lead:
                 leads.append(lead)
 
+        # Ranqueia os candidatos antes de escolher o principal.
+        # O ranking usa somente evidencias ja retornadas pela pesquisa.
+        termos = []
+        for campo in (nicho, cliente, decisao.get("problema")):
+            termos.extend(
+                palavra.lower()
+                for palavra in str(campo or "").replace(",", " ").split()
+                if len(palavra.strip()) >= 4
+            )
+        termos = list(dict.fromkeys(termos))
+
+        def pontuar(candidato):
+            texto = " ".join([
+                str(candidato.get("titulo") or ""),
+                str(candidato.get("resumo") or "")
+            ]).lower()
+            score = 0
+            if candidato.get("canal") in {"linkedin", "instagram"}:
+                score += 2
+            if "/in/" in str(candidato.get("url") or "") or "instagram.com/" in str(candidato.get("url") or ""):
+                score += 2
+            score += min(6, sum(1 for termo in termos if termo in texto))
+            if candidato.get("resumo"):
+                score += 1
+            candidato["score_aderencia"] = score
+            return score
+
+        candidatos.sort(key=pontuar, reverse=True)
+
         alvo = candidatos[0]
         canal = alvo["canal"]
-        lead_principal = leads[0] if leads else None
+        lead_principal = next(
+            (lead for lead in leads if lead.get("url") == alvo.get("url")),
+            leads[0] if leads else None
+        )
         registrar_evento(
             "alvo_pesquisado",
             f"Alvo público encontrado: {alvo['url']} via {canal}; lead registrado com proveniência e evidências."
