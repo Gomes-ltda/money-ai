@@ -11,6 +11,7 @@ from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cob
 
 app = Flask(__name__)
 APPROVAL_TOKEN = os.getenv("EVOLIA_APPROVAL_TOKEN", "").strip()
+PANEL_PASSWORD = os.getenv("EVOLIA_PANEL_PASSWORD", "").strip()
 
 
 def validar_token():
@@ -58,6 +59,15 @@ HTML = """
     </style>
 </head>
 <body>
+    <div id="loginPainel" style="max-width:420px;margin:80px auto;padding:25px;border:1px solid #ccc;border-radius:10px">
+        <h1>Evolia AI</h1>
+        <h2>Acesso restrito</h2>
+        <p>Este painel é privado. Informe a senha/chave de acesso.</p>
+        <input id="senhaPainel" type="password" placeholder="Senha do painel" autocomplete="current-password">
+        <button onclick="entrarPainel()">Entrar</button>
+        <div id="loginStatus" style="margin-top:12px"></div>
+    </div>
+    <div id="painel" style="display:none">
     <h1>Evolia AI</h1>
     <p>Objetivo atual da Evolia:</p>
 
@@ -93,7 +103,54 @@ HTML = """
     <button onclick="criarTestePix()">Criar teste Pix (sandbox)</button>
     <div id="testePix"></div>
 
+    </div>
     <script>
+        async function entrarPainel() {
+            const senha = document.getElementById("senhaPainel").value;
+            const status = document.getElementById("loginStatus");
+            if (!senha.trim()) {
+                status.textContent = "Informe a senha.";
+                return;
+            }
+            status.textContent = "Verificando acesso...";
+            try {
+                const resposta = await fetch("/painel-login", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({senha: senha})
+                });
+                const dados = await resposta.json();
+                if (!resposta.ok || !dados.token) {
+                    status.textContent = dados.erro || "Senha inválida.";
+                    return;
+                }
+                sessionStorage.setItem("evolia_token", dados.token);
+                document.getElementById("loginPainel").style.display = "none";
+                document.getElementById("painel").style.display = "block";
+                document.getElementById("tokenAutorizacao").value = dados.token;
+                iniciarAtualizacaoAutomatica();
+            } catch (erro) {
+                status.textContent = "Não foi possível verificar o acesso.";
+            }
+        }
+
+        async function validarSessaoPainel() {
+            const token = sessionStorage.getItem("evolia_token") || "";
+            if (!token) return false;
+            try {
+                const resposta = await fetch("/painel-status", {
+                    headers: {"Authorization": "Bearer " + token}
+                });
+                if (!resposta.ok) return false;
+                document.getElementById("loginPainel").style.display = "none";
+                document.getElementById("painel").style.display = "block";
+                document.getElementById("tokenAutorizacao").value = token;
+                return true;
+            } catch (erro) {
+                return false;
+            }
+        }
+
         async function executarCiclo() {
             const objetivo = document.getElementById("objetivo").value;
             const localizacao = document.getElementById("localizacao").value;
@@ -292,7 +349,11 @@ HTML = """
                 }, 10000);
             }
         }
-        window.addEventListener("load", iniciarAtualizacaoAutomatica);
+        window.addEventListener("load", async function() {
+            if (await validarSessaoPainel()) {
+                iniciarAtualizacaoAutomatica();
+            }
+        });
         document.getElementById("tokenAutorizacao").addEventListener("change", iniciarAtualizacaoAutomatica);
     </script>
 </body>
@@ -303,6 +364,28 @@ HTML = """
 @app.route("/")
 def home():
     return render_template_string(HTML)
+
+
+@app.route("/painel-login", methods=["POST"])
+def painel_login():
+    dados = request.get_json(silent=True) or {}
+    senha = str(dados.get("senha", "")).strip()
+
+    credencial = PANEL_PASSWORD or APPROVAL_TOKEN
+    if not credencial:
+        return jsonify({"erro": "Acesso do painel não configurado no servidor."}), 503
+
+    if not senha or senha != credencial:
+        return jsonify({"erro": "Senha inválida."}), 401
+
+    return jsonify({"status": "autorizado", "token": APPROVAL_TOKEN})
+
+
+@app.route("/painel-status")
+def painel_status():
+    if not validar_token():
+        return jsonify({"erro": "Não autorizado."}), 401
+    return jsonify({"status": "autorizado"})
 
 
 @app.route("/health")
@@ -533,6 +616,8 @@ def pagamentos_webhook():
 
 @app.route("/ciclo", methods=["POST"])
 def ciclo():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     dados = request.get_json(silent=True) or {}
 
     objetivo = str(
@@ -564,6 +649,8 @@ def ciclo():
 
 @app.route("/analisar", methods=["POST"])
 def analisar():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     dados = request.get_json(silent=True) or {}
 
     objetivo = str(
