@@ -24,6 +24,7 @@ def memoria_padrao():
         "acoes_externas": [],
         "pagamentos": [],
         "pedidos_clientes": [],
+        "leads": [],
         "financeiro": {
             "receita": 0,
             "custos": 0
@@ -55,6 +56,9 @@ def garantir_estrutura(memoria):
 
     if not isinstance(memoria.get("pedidos_clientes"), list):
         memoria["pedidos_clientes"] = []
+
+    if not isinstance(memoria.get("leads"), list):
+        memoria["leads"] = []
 
     return memoria
 
@@ -252,6 +256,66 @@ def registrar_aprendizado(aprendizado, estrategia=None, evidencias=None, impacto
     memoria["aprendizados"].append(registro)
     salvar_memoria(memoria)
     return registro
+
+
+def registrar_lead(proveniencia, url, canal, nome=None, resumo=None, motivo_aderencia=None,
+                   evidencia_publica=None, estrategia=None, nicho=None, problema=None,
+                   oferta=None, confianca=None):
+    memoria = carregar_memoria()
+    leads = memoria.setdefault("leads", [])
+    url = str(url or "").strip()
+    canal = str(canal or "").strip().lower()
+    if not url:
+        return None
+
+    for lead in reversed(leads):
+        if lead.get("url") == url and lead.get("estrategia") == estrategia:
+            lead["atualizado_em"] = agora()
+            return lead
+
+    lead = {
+        "id": __import__("uuid").uuid4().hex,
+        "criado_em": agora(),
+        "atualizado_em": agora(),
+        "status": "encontrado",
+        "proveniencia": proveniencia,
+        "url": url,
+        "canal": canal,
+        "nome": str(nome or "").strip(),
+        "resumo": str(resumo or "").strip(),
+        "motivo_aderencia": str(motivo_aderencia or "").strip(),
+        "evidencia_publica": evidencia_publica or [],
+        "estrategia": estrategia,
+        "nicho": nicho,
+        "problema": problema,
+        "oferta": oferta,
+        "confianca": confianca
+    }
+    leads.append(lead)
+    salvar_memoria(memoria)
+    return lead
+
+
+def obter_leads(status=None, limite=50):
+    leads = carregar_memoria().get("leads", [])
+    if status:
+        leads = [lead for lead in leads if lead.get("status") == status]
+    return leads[-limite:]
+
+
+def atualizar_lead(lead_id, status=None, **campos):
+    memoria = carregar_memoria()
+    for lead in reversed(memoria.get("leads", [])):
+        if lead.get("id") == lead_id:
+            if status is not None:
+                lead["status"] = str(status).strip()
+            for chave, valor in campos.items():
+                if valor is not None:
+                    lead[chave] = valor
+            lead["atualizado_em"] = agora()
+            salvar_memoria(memoria)
+            return lead
+    return None
 
 
 def registrar_acao_externa(tipo, alvo=None, canal=None, mensagem=None, estrategia=None, contexto=None):
