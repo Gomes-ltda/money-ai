@@ -437,3 +437,92 @@ FORMATO:
             "objetivo": objetivo,
             "localizacao": localizacao
         }
+
+
+def analisar_pedido_cliente(pedido, localizacao="Brasil"):
+    pedido = pedido or {}
+    nome = str(pedido.get("nome", "")).strip()
+    servico = str(pedido.get("servico", "")).strip()
+    descricao = str(pedido.get("descricao", "")).strip()
+    provider = AI_PROVIDER if AI_PROVIDER in {"auto", "gemini", "openai"} else "auto"
+
+    if provider == "gemini" and not GEMINI_API_KEY:
+        return {"status": "erro_configuracao", "erro": "GEMINI_API_KEY não configurada."}
+    if provider == "openai" and not OPENAI_API_KEY:
+        return {"status": "erro_configuracao", "erro": "OPENAI_API_KEY não configurada."}
+    if provider == "auto" and not GEMINI_API_KEY and not OPENAI_API_KEY:
+        return {"status": "erro_configuracao", "erro": "Nenhum provedor de IA configurado."}
+
+    consultas = [
+        f"como entregar {servico} para um cliente no Brasil",
+        f"preço de mercado para {servico} Brasil",
+        f"boas práticas e escopo de {servico}"
+    ]
+    try:
+        pesquisa = pesquisar_varias(consultas, localizacao)[:20]
+    except Exception:
+        pesquisa = []
+
+    prompt = f"""
+Você é o núcleo comercial da Evolia AI.
+Analise esta solicitação de cliente e prepare uma proposta realista.
+
+CLIENTE: {nome}
+SERVIÇO: {servico}
+PEDIDO: {descricao}
+LOCALIZAÇÃO: {localizacao}
+
+PESQUISA DE APOIO:
+{json.dumps(pesquisa, ensure_ascii=False, indent=2)}
+
+Regras:
+- Não invente informações.
+- Defina escopo claro e pequeno o suficiente para ser entregue.
+- Sugira preço em reais somente se houver base suficiente; caso contrário, use null.
+- Defina prazo realista.
+- Liste informações que ainda precisam ser confirmadas.
+- Não envie mensagens, cobre, publique ou execute ações externas.
+- A saída será revisada antes de ser publicada ao cliente.
+
+Retorne somente JSON:
+{{
+  "resumo": "...",
+  "escopo": ["..."],
+  "nao_incluido": ["..."],
+  "valor_sugerido": null,
+  "prazo_sugerido": "...",
+  "perguntas": ["..."],
+  "justificativa_preco": "...",
+  "riscos": ["..."],
+  "proposta_cliente": "...",
+  "confianca": "baixa|media|alta"
+}}
+"""
+    dados = None
+    modelo_usado = None
+    erro = None
+
+    if provider in {"auto", "gemini"} and GEMINI_API_KEY:
+        try:
+            cliente = genai.Client(api_key=GEMINI_API_KEY)
+            dados, modelo_usado, erro = _gerar_json(cliente, prompt)
+        except Exception as exc:
+            erro = str(exc)
+
+    if dados is None and provider in {"auto", "openai"}:
+        dados_openai, modelo_openai, erro_openai = _gerar_openai(prompt)
+        if dados_openai is not None:
+            dados, modelo_usado, erro = dados_openai, modelo_openai, None
+        else:
+            erro = erro_openai or erro
+
+    if dados is None:
+        return {"status": "erro_cerebro", "erro": erro or "Não foi possível analisar o pedido.", "pedido_id": pedido.get("id")}
+
+    return {
+        "status": "sucesso",
+        "pedido_id": pedido.get("id"),
+        "modelo_utilizado": modelo_usado,
+        "analise": dados,
+        "fontes_utilizadas": pesquisa
+    }
