@@ -84,8 +84,9 @@ ADMIN_HTML = """
             <div class="etapa"><strong>5. Executar</strong><span>Prepara ou executa ações autorizadas.</span></div>
             <div class="etapa"><strong>6. Aprender</strong><span>Registra resultados e ajusta o próximo ciclo.</span></div>
         </div>
-        <button id="botaoCiclo" class="botao-principal" onclick="executarCiclo()">Iniciar ciclo agora</button>
-        <div class="info">Localização e outros dados de contexto são definidos pela operação quando forem necessários.</div>
+        <button id="botaoCiclo" class="botao-principal" onclick="executarCiclo()">Iniciar ciclo da EVOLIA</button>
+        <button id="botaoProspeccao" class="botao-principal" style="margin-top:10px;background:#fff;color:#111;border-color:#111" onclick="prospectarClientes()">Procurar clientes agora</button>
+        <div class="info">O ciclo geral trabalha a estratégia. A prospecção usa o mesmo ciclo para procurar oportunidades de clientes e preparar abordagens para sua aprovação.</div>
         <div id="resultado"></div>
     </section>
     <hr>
@@ -150,6 +151,44 @@ ADMIN_HTML = """
 
         function obterToken() {
             return document.getElementById("tokenAutorizacao").value.trim() || sessionStorage.getItem("evolia_token") || "";
+        }
+
+        async function prospectarClientes() {
+            const resultado = document.getElementById("resultado");
+            const botao = document.getElementById("botaoProspeccao");
+            const statusGeral = document.getElementById("statusGeral");
+            const token = obterToken();
+            if (!token) {
+                resultado.textContent = "Token de autorização não encontrado. Entre novamente no painel.";
+                statusGeral.textContent = "Acesso necessário";
+                return;
+            }
+            resultado.textContent = "A EVOLIA está procurando oportunidades de clientes...";
+            statusGeral.textContent = "Prospectando";
+            botao.disabled = true;
+            try {
+                const resposta = await fetch("/ciclo", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json", "Authorization": "Bearer " + token},
+                    body: JSON.stringify({
+                        objetivo: "Encontrar potenciais clientes reais para os serviços da Evolia, identificar uma necessidade pública verificável, preparar uma abordagem comercial personalizada e não enviar nenhuma mensagem sem autorização."
+                    })
+                });
+                const dados = await resposta.json();
+                if (!resposta.ok) {
+                    resultado.textContent = dados.erro || "Erro durante a prospecção.";
+                    statusGeral.textContent = "Erro";
+                    return;
+                }
+                resultado.textContent = JSON.stringify(dados, null, 2);
+                statusGeral.textContent = "Prospecção concluída";
+                carregarAcoes();
+            } catch (erro) {
+                resultado.textContent = "Erro de conexão com a Evolia.";
+                statusGeral.textContent = "Erro";
+            } finally {
+                botao.disabled = false;
+            }
         }
 
         async function executarCiclo() {
