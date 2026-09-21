@@ -354,7 +354,7 @@ ADMIN_HTML = """
                     "<label>Prazo</label><input id='pp-"+p.id+"' value='"+esc(prop.prazo)+"' placeholder='Ex.: 3 dias úteis'>"+
                     "<label>Entrega</label><textarea id='et-"+p.id+"' placeholder='Resultado entregue ao cliente'>"+esc(ent.texto)+"</textarea>"+
                     "<label>Link da entrega (opcional)</label><input id='eu-"+p.id+"' value='"+esc(ent.url)+"' placeholder='https://...'>"+
-                    "<button onclick='salvarPedidoCliente(""+p.id+"")'>Salvar / publicar</button> <a href='/pedido/"+encodeURIComponent(p.token_publico)+"' target='_blank'>Abrir página do cliente</a></div>";
+                    "<button onclick='salvarPedidoCliente(&quot;"+p.id+"&quot;)'>Salvar / publicar</button> <a href='/pedido/"+encodeURIComponent(p.token_publico)+"' target='_blank'>Abrir página do cliente</a></div>";
                 }).join("");
             } catch(e) {}
         }
