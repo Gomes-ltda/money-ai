@@ -7,7 +7,7 @@ from memory import registrar_evento, registrar_teste, registrar_acao_externa, ob
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "preparar_abordagem", "pesquisar_alvo", "testar_estrategia"
+    "criar_proposta", "criar_conteudo", "preparar_abordagem", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
 }
 
 def agora():
@@ -42,6 +42,8 @@ class Executor:
                 resultado = self.criar_conteudo(decisao)
             elif acao == "pesquisar_alvo":
                 resultado = self.pesquisar_alvo(decisao)
+            elif acao == "validar_alvo":
+                resultado = self.validar_alvo(decisao)
             elif acao == "preparar_abordagem":
                 resultado = self.preparar_abordagem(decisao)
             elif acao == "testar_estrategia":
@@ -267,6 +269,72 @@ class Executor:
                 "lead_principal": lead_principal,
                 "leads_registrados": leads,
                 "candidatos": candidatos[:5]
+            }
+        }
+
+    def validar_alvo(self, decisao):
+        """Valida o alvo com evidencia publica antes de permitir uma abordagem."""
+        anterior = decisao.get("resultado_anterior") or {}
+        resultado_anterior = anterior.get("resultado", {}) if isinstance(anterior, dict) else {}
+        alvo = resultado_anterior.get("alvo_encontrado") or {}
+        url = (resultado_anterior.get("url_alvo") or decisao.get("url_alvo") or "").strip()
+
+        if not url.startswith(("https://", "http://")):
+            return {"status": "bloqueado", "acao": "validar_alvo", "motivo": "Nao ha URL publica especifica para validar o alvo."}
+
+        consulta = f'"{url}" contexto negocio servico perfil cliente necessidade {decisao.get("nicho", "")} {decisao.get("problema", "")}'
+        pesquisa = pesquisar(consulta, decisao.get("localizacao", "Brasil"))
+        resultados = pesquisa.get("resultados", []) if isinstance(pesquisa, dict) else []
+
+        texto = " ".join([
+            str(alvo.get("titulo") or ""),
+            str(alvo.get("resumo") or ""),
+            " ".join(str(item.get("resumo") or "") for item in resultados if isinstance(item, dict))
+        ]).strip()
+
+        termos_problema = [
+            termo.lower()
+            for termo in str(decisao.get("problema") or "").replace(",", " ").split()
+            if len(termo.strip()) >= 5
+        ]
+        texto_lower = texto.lower()
+        sinais = [termo for termo in termos_problema if termo in texto_lower]
+        confianca = "alta" if len(sinais) >= 2 else "media" if len(sinais) == 1 else "baixa"
+        validado = bool(sinais) and bool(texto)
+
+        evidencia = [
+            {"tipo": "url_alvo", "url": url},
+            {"tipo": "sinais_problema", "termos": sinais},
+            {"tipo": "resultado_validacao", "resumos": [
+                str(item.get("resumo") or "")[:500]
+                for item in resultados[:5] if isinstance(item, dict)
+            ]}
+        ]
+        motivo = (
+            "Foram encontrados sinais publicos compativeis com o problema pesquisado."
+            if validado else
+            "A pesquisa publica nao trouxe evidencia suficiente para afirmar que o problema existe neste alvo."
+        )
+
+        lead = resultado_anterior.get("lead_principal") or {}
+        if lead.get("id"):
+            from memory import atualizar_lead
+            atualizar_lead(
+                lead["id"],
+                status="validado" if validado else "nao_validado",
+                evidencia_publica=evidencia,
+                motivo_aderencia=motivo,
+                confianca=confianca
+            )
+
+        registrar_evento("validacao_alvo", f"Alvo {'validado' if validado else 'nao validado'}: {url}")
+        return {
+            "status": "executado" if validado else "bloqueado",
+            "acao": "validar_alvo",
+            "resultado": {
+                "receita": 0, "custo": 0, "validado": validado,
+                "confianca": confianca, "url_alvo": url, "alvo": alvo,
+                "sinais_problema": sinais, "evidencia": evidencia, "motivo": motivo
             }
         }
 
