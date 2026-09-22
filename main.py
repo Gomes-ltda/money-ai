@@ -1190,7 +1190,7 @@ def pagamentos_webhook():
     return jsonify(resultado), 200
 
 
-@app.route("/ciclo", methods=["POST"])
+@app.route("/ciclo-autonomo", methods=["POST"])\ndef ciclo_autonomo():\n    """Executa um ciclo operacional sem depender do painel, protegido por token de automação."""\n    token = request.headers.get("Authorization", "").replace("Bearer ", "").strip()\n    cron_token = os.getenv("EVOLIA_CRON_TOKEN", "").strip()\n    if not cron_token or token != cron_token:\n        return jsonify({"erro": "Não autorizado."}), 401\n\n    dados = request.get_json(silent=True) or {}\n    objetivo = str(dados.get("objetivo", "Gerar receita de forma legítima e sustentável: pesquisar mercado, validar oportunidades, preparar abordagens e acompanhar o funil comercial.")).strip()\n    localizacao = str(dados.get("localizacao", "Brasil")).strip() or "Brasil"\n\n    try:\n        resultado = executar_ciclo(objetivo, localizacao)\n        return jsonify(resultado)\n    except Exception as erro:\n        return jsonify({"status": "erro", "erro": str(erro)}), 500\n\n\n@app.route("/ciclo", methods=["POST"])
 def ciclo():
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
