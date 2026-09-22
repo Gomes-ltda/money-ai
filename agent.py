@@ -10,7 +10,8 @@ from memory import (
     obter_contexto_estrategico,
     avaliar_estrategias,
     obter_ultimo_ciclo,
-    obter_estado_comercial
+    obter_estado_comercial,
+    obter_leads
 )
 
 ACOES_PERMITIDAS = {
@@ -164,8 +165,22 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
             "ciclo_memoria": ciclo
         }
 
-    detalhes = decisao_ia.get("decisao", {})
+    detalhes = dict(decisao_ia.get("decisao", {}) or {})
     acao_inicial = detalhes.get("acao_executor", decisao_ia.get("acao_executor"))
+
+    # Reaproveita alvos já validados pela memória antes de iniciar nova prospecção.
+    if acao_inicial in {"preparar_abordagem", "validar_alvo"} and not detalhes.get("url_alvo"):
+        leads_validos = [
+            lead for lead in obter_leads(status="validado", limite=100)
+            if not detalhes.get("estrategia") or lead.get("estrategia") == detalhes.get("estrategia")
+        ]
+        if leads_validos:
+            lead = leads_validos[-1]
+            detalhes["url_alvo"] = lead.get("url")
+            detalhes["canal"] = detalhes.get("canal") or lead.get("canal")
+            detalhes["cliente_alvo"] = detalhes.get("cliente_alvo") or lead.get("nome")
+            detalhes["alvo_validado"] = True
+            detalhes["evidencia_alvo_memoria"] = lead.get("evidencia_publica") or []
 
     if acao_inicial not in ACOES_PERMITIDAS:
         acao_inicial = "aguardar"
