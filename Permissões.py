@@ -16,6 +16,10 @@ PERMISSOES_PADRAO = {
     "preparar_abordagem": True,
     "pesquisar_alvo": True,
     "testar_estrategia": True,
+    "acompanhar_lead": True,
+    "preparar_followup": True,
+    "medir_resultado": True,
+    "validar_alvo": True,
     "registrar_resultado": True,
     "criar_tarefa": True,
 
