@@ -261,6 +261,9 @@ AÇÕES DISPONÍVEIS AO EXECUTOR:
 - criar_conteudo
 - preparar_abordagem
 - testar_estrategia
+- acompanhar_lead
+- preparar_followup
+- medir_resultado
 
 ESCOLHA EXATAMENTE UMA.
 
