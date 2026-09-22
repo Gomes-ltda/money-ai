@@ -20,7 +20,7 @@ from memory import (
 
 ACOES_PERMITIDAS = {
     "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "executar_pedido", "pesquisar_alvo", "validar_alvo", "preparar_abordagem", "testar_estrategia", "acompanhar_lead", "processar_resposta", "preparar_followup", "medir_resultado"
+    "criar_proposta", "criar_conteudo", "executar_pedido", "validar_resultado", "pesquisar_alvo", "validar_alvo", "preparar_abordagem", "testar_estrategia", "acompanhar_lead", "processar_resposta", "preparar_followup", "medir_resultado"
 }
 
 MAX_TAREFAS_POR_CICLO = 6
@@ -285,7 +285,34 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
 
     # Antes de prospectar novamente, prioriza leads já em andamento.
     # A EVOLIA deve avançar o funil existente antes de criar trabalho novo.
-    pedidos_em_execucao = [p for p in __import__("memory").obter_pedidos_clientes(100) if p.get("status") == "em_execucao"]
+    pedidos_prontos = [
+        p for p in __import__("memory").obter_pedidos_clientes(100)
+        if p.get("status") == "em_execucao"
+        and (p.get("execucao") or {}).get("status") == "resultado_pronto"
+    ]
+    if pedidos_prontos:
+        pedido = pedidos_prontos[0]
+        detalhes["pedido_id"] = pedido.get("id")
+        detalhes["cliente_alvo"] = pedido.get("nome")
+        detalhes["oferta"] = pedido.get("servico")
+        detalhes["problema"] = pedido.get("descricao")
+        acao_inicial = "validar_resultado"
+        detalhes["motivo_escolha"] = "Existe resultado pronto; validar antes de disponibilizar a entrega ao cliente."
+
+    else:
+        pedidos_em_execucao = [
+            p for p in __import__("memory").obter_pedidos_clientes(100)
+            if p.get("status") == "em_execucao"
+        ]
+        if pedidos_em_execucao:
+            pedido = pedidos_em_execucao[0]
+            detalhes["pedido_id"] = pedido.get("id")
+            detalhes["cliente_alvo"] = pedido.get("nome")
+            detalhes["oferta"] = pedido.get("servico")
+            detalhes["problema"] = pedido.get("descricao")
+            acao_inicial = "executar_pedido"
+            detalhes["motivo_escolha"] = "Existe pedido pago em execução; produzir o resultado antes de iniciar novo trabalho comercial."
+
     if pedidos_em_execucao:
         pedido = pedidos_em_execucao[0]
         detalhes["pedido_id"] = pedido.get("id")
