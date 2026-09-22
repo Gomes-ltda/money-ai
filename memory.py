@@ -374,6 +374,26 @@ def atualizar_acao_externa(acao_id, status, resultado=None):
                 acao["executada_em"] = agora()
             if resultado is not None:
                 acao["resultado"] = resultado
+
+            # Mantém o funil do lead sincronizado com a ação comercial.
+            lead_id = (acao.get("contexto") or {}).get("lead_id")
+            if lead_id:
+                mapa_status = {
+                    "aguardando_autorizacao": "abordagem_preparada",
+                    "autorizada": "autorizado",
+                    "executada": "contato_executado",
+                    "falhou": "falhou",
+                    "cancelada": "cancelado"
+                }
+                novo_status = mapa_status.get(status)
+                if novo_status:
+                    for lead in reversed(memoria.get("leads", [])):
+                        if lead.get("id") == lead_id:
+                            lead["status"] = novo_status
+                            lead["ultima_acao_externa_id"] = acao_id
+                            lead["atualizado_em"] = agora()
+                            break
+
             salvar_memoria(memoria)
             return acao
     return None
@@ -388,6 +408,25 @@ def registrar_feedback_acao_externa(acao_id, resposta=None, interesse=None, vend
             if venda and any(bool(x.get("venda")) for x in feedbacks):
                 return {"erro": "Esta ação já possui uma venda registrada."}
             feedbacks.append(feedback)
+
+            # Feedback transforma o estado comercial do lead persistido.
+            lead_id = (acao.get("contexto") or {}).get("lead_id")
+            if lead_id:
+                if venda:
+                    novo_status = "venda"
+                elif interesse:
+                    novo_status = "interesse"
+                elif resposta:
+                    novo_status = "resposta"
+                else:
+                    novo_status = "contato_executado"
+                for lead in reversed(memoria.get("leads", [])):
+                    if lead.get("id") == lead_id:
+                        lead["status"] = novo_status
+                        lead["ultima_acao_externa_id"] = acao_id
+                        lead["atualizado_em"] = agora()
+                        break
+
             salvar_memoria(memoria)
             if venda:
                 registrar_resultado(
