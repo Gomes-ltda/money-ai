@@ -306,6 +306,10 @@ Se houver abordagem externa já executada e ainda não houver resposta ou intere
 Se houver abordagem executada sem resposta e já tiver passado tempo suficiente para acompanhamento, sem follow-up pendente ou já preparado:
 "preparar_followup". Essa ação apenas prepara o contato e aguarda autorização; nunca envie a mensagem.
 
+Se o estado comercial indicar "aguardando_autorizacao", não crie uma ação externa equivalente; aguarde autorização.
+Se o estado indicar "contato_executado" sem resposta, priorize "acompanhar_lead".
+Se houver follow-up pendente, não crie outro follow-up para o mesmo contato.
+
 Se houver feedback comercial suficiente para medir receita, custos ou vendas:
 "medir_resultado". A medição é histórica e não representa receita nova do ciclo.
 
