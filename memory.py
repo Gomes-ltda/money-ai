@@ -597,7 +597,20 @@ def obter_estado_comercial(estrategia=None):
         if any(f.get("interesse") for f in feedbacks): estados["com_interesse"] += 1
         if any(f.get("venda") for f in feedbacks): estados["vendas"] += 1
         ultimas.append({"id": acao.get("id"), "status": status, "alvo": acao.get("alvo"), "canal": acao.get("canal"), "estrategia": acao.get("estrategia")})
-    return {"funil": estados, "ultima_acao_externa": ultimas[-1] if ultimas else None, "ultimas_acoes": ultimas[-10:]}
+    fase = "pesquisa"
+    if estados["vendas"] > 0:
+        fase = "venda"
+    elif estados["com_interesse"] > 0:
+        fase = "interesse"
+    elif estados["com_resposta"] > 0:
+        fase = "resposta"
+    elif estados["executadas"] > 0:
+        fase = "contato_executado"
+    elif estados["aguardando_autorizacao"] > 0:
+        fase = "aguardando_autorizacao"
+    elif estados["autorizadas"] > 0:
+        fase = "autorizado"
+    return {"funil": estados, "fase": fase, "ultima_acao_externa": ultimas[-1] if ultimas else None, "ultimas_acoes": ultimas[-10:]}
 
 
 def obter_acoes_externas(status=None, limite=20):
