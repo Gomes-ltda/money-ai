@@ -283,6 +283,22 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
     detalhes = dict(decisao_ia.get("decisao", {}) or {})
     acao_inicial = detalhes.get("acao_executor", decisao_ia.get("acao_executor"))
 
+    # Pedidos recém-recebidos têm prioridade sobre nova prospecção.
+    # Como /solicitar não bloqueia mais o cliente esperando a IA, o ciclo
+    # autônomo precisa assumir esses pedidos na próxima execução.
+    pedidos_pendentes = [
+        p for p in __import__("memory").obter_pedidos_clientes(100)
+        if p.get("status") in {"recebido", "em_analise"}
+    ]
+    if pedidos_pendentes:
+        pedido = pedidos_pendentes[0]
+        detalhes["pedido_id"] = pedido.get("id")
+        detalhes["cliente_alvo"] = pedido.get("nome")
+        detalhes["oferta"] = pedido.get("servico")
+        detalhes["problema"] = pedido.get("descricao")
+        acao_inicial = "analisar_pedido_cliente"
+        detalhes["motivo_escolha"] = "Existe pedido de cliente pendente; analisar e preparar a proposta antes de iniciar nova prospecção."
+
     # Antes de prospectar novamente, prioriza leads já em andamento.
     # A EVOLIA deve avançar o funil existente antes de criar trabalho novo.
     pedidos_prontos = [
