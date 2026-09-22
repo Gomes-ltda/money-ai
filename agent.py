@@ -8,7 +8,8 @@ from memory import (
     registrar_aprendizado,
     obter_ultimos_aprendizados,
     obter_contexto_estrategico,
-    avaliar_estrategias
+    avaliar_estrategias,
+    obter_ultimo_ciclo
 )
 
 ACOES_PERMITIDAS = {
@@ -45,9 +46,21 @@ def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
 def executar_ciclo(objetivo, localizacao="Brasil"):
     memoria = obter_ultimos_aprendizados(10)
     contexto_estrategico = obter_contexto_estrategico()
+    ciclo_anterior = obter_ultimo_ciclo()
+
+    contexto_ciclo = {
+        "tipo": "ciclo_anterior",
+        "dados": ciclo_anterior or {},
+        "instrucao": "Use este ciclo como estado de continuidade; não repita mecanicamente a última ação."
+    }
 
     decisao_ia = analisar_oportunidade(
-        objetivo, localizacao, contexto_memoria=memoria + [{"tipo": "desempenho_estrategico", "dados": contexto_estrategico}]
+        objetivo,
+        localizacao,
+        contexto_memoria=memoria + [
+            {"tipo": "desempenho_estrategico", "dados": contexto_estrategico},
+            contexto_ciclo
+        ]
     )
 
     if decisao_ia.get("status") in {"erro_cota", "erro", "erro_configuracao"}:
@@ -131,7 +144,9 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
             analise=decisao_ia,
             decisao=decisao_degradada,
             execucao=execucao_degradada,
-            medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "modo_degradado"}
+            medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "modo_degradado"},
+            aprendizado=decisao_ia.get("aprendizado_esperado"),
+            proxima_acao=decisao_ia.get("proximo_passo")
         )
         return {
             "status": "modo_degradado",
@@ -270,11 +285,18 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
             acao=acao_inicial
         )
 
+    proxima_acao = detalhes.get("proxima_acao_ciclo") or decisao_ia.get("proximo_passo")
+    aprendizado_ciclo = decisao_ia.get("aprendizado_esperado") or (
+        "Resultado do ciclo: R${:.2f}; ação executada: {}.".format(resultado, acao_inicial)
+    )
+
     ciclo = registrar_ciclo(
         objetivo=objetivo, localizacao=localizacao,
         pesquisa=decisao_ia.get("fontes_utilizadas"),
         analise=decisao_ia, decisao=decisao,
-        execucao=execucao, medicao=medicao
+        execucao=execucao, medicao=medicao,
+        aprendizado=aprendizado_ciclo,
+        proxima_acao=proxima_acao
     )
 
     return {
