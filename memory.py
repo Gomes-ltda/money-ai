@@ -582,7 +582,7 @@ def obter_estado_comercial(estrategia=None):
     acoes = memoria.get("acoes_externas", [])
     if estrategia:
         acoes = [x for x in acoes if x.get("estrategia") == estrategia]
-    estados = {"aguardando_autorizacao": 0, "autorizadas": 0, "executadas": 0, "falhas": 0, "com_resposta": 0, "com_interesse": 0, "vendas": 0}
+    estados = {"aguardando_autorizacao": 0, "autorizadas": 0, "executadas": 0, "falhas": 0, "com_resposta": 0, "com_interesse": 0, "vendas": 0, "followups": 0, "ultimo_status": None}
     ultimas = []
     for acao in acoes[-50:]:
         status = acao.get("status")
