@@ -590,6 +590,14 @@ def obter_ultimos_aprendizados(limite=10):
 
 
 def avaliar_estrategias(limite_resultados=50):
+    """
+    Avalia estratégias sem confundir ausência de receita com prejuízo.
+
+    Ciclos de pesquisa, análise ou preparação normalmente geram R$0 de
+    receita e R$0 de custo. Isso significa "sem evidência financeira ainda",
+    não uma tentativa fracassada. Sinais negativos repetidos exigem perda
+    financeira real ou custo sem retorno.
+    """
     memoria = carregar_memoria()
     resultados = memoria["resultados"][-limite_resultados:]
     agrupadas = {}
@@ -605,34 +613,50 @@ def avaliar_estrategias(limite_resultados=50):
         positivos = sum(1 for x in valores if x > 0)
         negativos = sum(1 for x in valores if x < 0)
         zeros = sum(1 for x in valores if x == 0)
-        consecutivos = 0
-        for valor in reversed(valores):
-            if valor <= 0:
-                consecutivos += 1
+
+        testes_financeiros = [
+            x for x in itens
+            if float(x.get("custo", 0) or 0) > 0
+            or float(x.get("resultado", 0) or 0) < 0
+            or float(x.get("receita", 0) or 0) > 0
+        ]
+
+        consecutivos_sem_retorno = 0
+        for item in reversed(testes_financeiros):
+            resultado_item = float(item.get("resultado", 0) or 0)
+            if resultado_item <= 0:
+                consecutivos_sem_retorno += 1
             else:
                 break
-        total_receita, total_custo, total_resultado = sum(receitas), sum(custos), sum(valores)
+
+        total_receita = sum(receitas)
+        total_custo = sum(custos)
+        total_resultado = sum(valores)
 
         if positivos > 0 and total_resultado > 0:
             estado, recomendacao = "sinal_positivo", "continuar"
-        elif len(itens) >= 3 and consecutivos >= 3:
+        elif len(testes_financeiros) >= 3 and consecutivos_sem_retorno >= 3 and total_resultado < 0:
             estado, recomendacao = "sinal_negativo", "modificar"
-        elif len(itens) >= 2 and negativos > 0 and total_resultado < 0:
+        elif len(testes_financeiros) >= 2 and negativos > 0 and total_resultado < 0:
             estado, recomendacao = "sinal_negativo", "modificar"
         else:
             estado, recomendacao = "em_teste", "testar_mais"
 
         avaliadas[nome] = {
-            "tentativas": len(itens), "receita_total": total_receita,
-            "custo_total": total_custo, "resultado_total": total_resultado,
-            "resultados_positivos": positivos, "resultados_negativos": negativos,
+            "tentativas": len(itens),
+            "tentativas_financeiras": len(testes_financeiros),
+            "receita_total": total_receita,
+            "custo_total": total_custo,
+            "resultado_total": total_resultado,
+            "resultados_positivos": positivos,
+            "resultados_negativos": negativos,
             "resultados_zero": zeros,
-            "tentativas_consecutivas_sem_resultado_positivo": consecutivos,
-            "ultimo_resultado": valores[-1], "estado": estado,
+            "tentativas_consecutivas_sem_retorno_financeiro": consecutivos_sem_retorno,
+            "ultimo_resultado": valores[-1],
+            "estado": estado,
             "recomendacao": recomendacao
         }
     return avaliadas
-
 
 def obter_contexto_estrategico(limite_resultados=10, limite_testes=10, limite_aprendizados=10):
     memoria = carregar_memoria()
