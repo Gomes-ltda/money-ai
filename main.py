@@ -680,7 +680,16 @@ footer{background:#111;color:#aaa;padding:30px 0}
 </main>
 <footer><div class="wrap">Evolia AI · Serviços digitais</div></footer>
 <script>
-async function carregarMeusPedidos(){const b=document.getElementById("listaMeusPedidos");if(!b)return;try{const r=await fetch("/meus-pedidos",{credentials:"same-origin"});const d=await r.json();if(!r.ok){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos.</p>";return;}const p=d.pedidos||[];b.innerHTML=p.length?p.map(x=>"<div style=\"border:1px solid #ddd;border-radius:12px;padding:14px;margin:10px 0\"><strong>Pedido "+x.id+"</strong><p class=\"small\">Status: "+x.status_label+"</p><a class=\"btn\" href=\""+x.url+"\">Acompanhar pedido</a></div>").join(""):"<p class='small'>Nenhum pedido encontrado neste navegador.</p>"}catch(e){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos agora.</p>"}}
+async function carregarMeusPedidos(){
+ const b=document.getElementById("listaMeusPedidos");if(!b)return;
+ try{
+  const r=await fetch("/meus-pedidos",{credentials:"same-origin",cache:"no-store"});
+  const d=await r.json();
+  if(!r.ok){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos.</p>";return;}
+  const p=d.pedidos||[];
+  b.innerHTML=p.length?p.map(x=>"<div style=\"border:1px solid #ddd;border-radius:12px;padding:14px;margin:10px 0\"><strong>Pedido "+x.id+"</strong><p class=\"small\">Status: "+x.status_label+"</p><a class=\"btn\" href=\""+x.url+"\">Acompanhar pedido</a></div>").join(""):"<p class='small'>Nenhum pedido encontrado neste navegador.</p>";
+ }catch(e){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos agora.</p>";}
+}
 async function enviarPedido(event){
  event.preventDefault();
  const box=document.getElementById("pedidoResultado");
@@ -695,7 +704,6 @@ async function enviarPedido(event){
   })});
   const d=await r.json();
   if(!r.ok){box.textContent=d.erro||"Não foi possível enviar o pedido.";return;}
-  try{await fetch("/meus-pedidos/registrar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:d.url_publica.split("/pedido/")[1]||""}),credentials:"same-origin"});}catch(e){}
   carregarMeusPedidos();
   box.innerHTML="<strong>Pedido recebido.</strong><div id='pedidoAoVivo' style='margin-top:14px;padding:14px;border:1px solid #ddd;border-radius:12px'><p class='small'>Carregando acompanhamento...</p></div><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
   acompanharPedidoAoVivo(d.url_publica);
@@ -704,6 +712,7 @@ async function enviarPedido(event){
 }
 async function acompanharPedidoAoVivo(url){const box=document.getElementById("pedidoAoVivo");if(!box)return;const token=url.split("/pedido/")[1]||"";async function atualizar(){try{const r=await fetch("/pedido/"+encodeURIComponent(token)+"/dados");const d=await r.json();if(!r.ok)return;let h="<strong>Status:</strong> "+d.status_label;if(d.proposta_publicada&&d.proposta){h+="<hr><strong>Proposta disponível</strong><p>"+String(d.proposta.texto||"").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>")+"</p>";if(d.proposta.valor!=null)h+="<p><strong>Valor:</strong> R$ "+Number(d.proposta.valor).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</p>";if(d.status==="proposta_enviada")h+="<p><a class='btn' href='"+url+"'>Abrir proposta e aceitar</a></p>";}box.innerHTML=h;}catch(e){}}await atualizar();const antigo=window.evoliaPedidoInterval; if(antigo)clearInterval(antigo);window.evoliaPedidoInterval=setInterval(atualizar,5000)}
 carregarMeusPedidos();
+setInterval(carregarMeusPedidos,5000);
 </script>
 </body>
 </html>
@@ -750,7 +759,21 @@ def solicitar():
         }
     })
     resposta.status_code = 201
-    resposta.set_cookie("evolia_pedidos", pedido["token_publico"], max_age=60*60*24*365, httponly=True, samesite="Lax", secure=request.is_secure)
+    atuais = [x.strip() for x in request.cookies.get("evolia_pedidos", "").split(",") if x.strip()]
+    token_novo = pedido["token_publico"]
+    if token_novo in atuais:
+        atuais.remove(token_novo)
+    atuais.insert(0, token_novo)
+    resposta.set_cookie(
+        "evolia_pedidos",
+        ",".join(atuais[:20]),
+        max_age=60*60*24*365,
+        httponly=True,
+        samesite="Lax",
+        secure=request.is_secure,
+        path="/"
+    )
+    resposta.headers["Cache-Control"] = "no-store"
     return resposta
 
 
@@ -766,7 +789,16 @@ def registrar_meu_pedido():
         atuais.insert(0, token)
     atuais = atuais[:20]
     resposta = jsonify({"status": "registrado"})
-    resposta.set_cookie("evolia_pedidos", ",".join(atuais), max_age=60*60*24*365, httponly=True, samesite="Lax", secure=request.is_secure)
+    resposta.set_cookie(
+        "evolia_pedidos",
+        ",".join(atuais),
+        max_age=60*60*24*365,
+        httponly=True,
+        samesite="Lax",
+        secure=request.is_secure,
+        path="/"
+    )
+    resposta.headers["Cache-Control"] = "no-store"
     return resposta
 
 
@@ -784,7 +816,9 @@ def meus_pedidos():
             continue
         vistos.add(token)
         pedidos.append({"id": pedido.get("id"), "status": pedido.get("status"), "status_label": labels.get(pedido.get("status"), pedido.get("status") or "Em acompanhamento"), "url": request.host_url.rstrip("/") + "/pedido/" + token, "criado_em": pedido.get("criado_em")})
-    return jsonify({"pedidos": pedidos[:20]})
+    resposta = jsonify({"pedidos": pedidos[:20]})
+    resposta.headers["Cache-Control"] = "no-store"
+    return resposta
 
 
 @app.route("/pedido/<token>/dados")
