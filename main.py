@@ -695,7 +695,9 @@ async function enviarPedido(event){
   })});
   const d=await r.json();
   if(!r.ok){box.textContent=d.erro||"Não foi possível enviar o pedido.";return;}
-  const pedidos=JSON.parse(localStorage.getItem("evolia_pedidos")||"[]"); pedidos.unshift({id:d.pedido_id,url:d.url_publica,criado_em:new Date().toISOString()}); localStorage.setItem("evolia_pedidos",JSON.stringify(pedidos.slice(0,20))); carregarMeusPedidos(); box.innerHTML="<strong>Pedido recebido.</strong><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
+  try{const pedidos=JSON.parse(localStorage.getItem("evolia_pedidos")||"[]"); pedidos.unshift({id:d.pedido_id,url:d.url_publica,criado_em:new Date().toISOString()}); localStorage.setItem("evolia_pedidos",JSON.stringify(pedidos.slice(0,20)));}catch(e){}
+  carregarMeusPedidos();
+  box.innerHTML="<strong>Pedido recebido.</strong><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
   document.getElementById("pedidoForm").reset();
  }catch(e){box.textContent="Erro de conexão. Tente novamente.";}
 }
