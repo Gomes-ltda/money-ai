@@ -9,7 +9,8 @@ from memory import (
     obter_ultimos_aprendizados,
     obter_contexto_estrategico,
     avaliar_estrategias,
-    obter_ultimo_ciclo
+    obter_ultimo_ciclo,
+    obter_estado_comercial
 )
 
 ACOES_PERMITIDAS = {
@@ -48,6 +49,7 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
     memoria = obter_ultimos_aprendizados(10)
     contexto_estrategico = obter_contexto_estrategico()
     ciclo_anterior = obter_ultimo_ciclo()
+    estado_comercial = obter_estado_comercial()
 
     contexto_ciclo = {
         "tipo": "ciclo_anterior",
@@ -60,7 +62,8 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
         localizacao,
         contexto_memoria=memoria + [
             {"tipo": "desempenho_estrategico", "dados": contexto_estrategico},
-            contexto_ciclo
+            contexto_ciclo,
+            {"tipo": "estado_comercial", "dados": estado_comercial}
         ]
     )
 
