@@ -17,6 +17,7 @@ PERMISSOES_PADRAO = {
     "criar_conteudo": True,
     "executar_pedido": True,
     "validar_resultado": True,
+    "entregar_servico_email": True,
     "preparar_abordagem": True,
     "pesquisar_alvo": True,
     "testar_estrategia": True,
