@@ -61,9 +61,11 @@ def criar_tarefas(decisao):
         for acao_tarefa, descricao in CADEIA_PROCESSO[indice:]:
             adicionar(acao_tarefa, descricao)
     elif acao == "preparar_abordagem":
-        # Mantém a cadeia alvo -> validação -> abordagem para garantir dependências.
-        for acao_tarefa, descricao in CADEIA_PROCESSO[4:]:
-            adicionar(acao_tarefa, descricao)
+        if decisao.get("alvo_validado") and decisao.get("url_alvo"):
+            adicionar("preparar_abordagem", "Preparar a abordagem do alvo já validado.")
+        else:
+            for acao_tarefa, descricao in CADEIA_PROCESSO[4:]:
+                adicionar(acao_tarefa, descricao)
     elif acao == "preparar_followup":
         adicionar("preparar_followup", "Preparar acompanhamento de uma abordagem já executada.")
     elif acao == "acompanhar_lead":
