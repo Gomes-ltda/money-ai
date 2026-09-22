@@ -3,7 +3,7 @@ import uuid
 
 from Permissões import solicitar_permissao
 from pesquisa import pesquisar
-from memory import registrar_evento, registrar_teste, registrar_acao_externa, obter_acoes_externas, registrar_lead
+from memory import registrar_evento, registrar_teste, registrar_acao_externa, obter_acoes_externas, registrar_lead, obter_leads, atualizar_lead
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
@@ -362,7 +362,6 @@ class Executor:
                     lead = lead_memoria
                     break
         if lead.get("id"):
-            from memory import atualizar_lead
             atualizar_lead(
                 lead["id"],
                 status="validado" if validado else "nao_validado",
@@ -382,7 +381,7 @@ class Executor:
                 "canal": lead_principal.get("canal") or alvo.get("canal"),
                 "cliente_alvo": lead_principal.get("nome") or alvo.get("titulo"),
                 "alvo": alvo, "lead_principal": lead_principal,
-                "sinais_problema": sinais, "evidencia": evidencia, "motivo": motivo
+                "sinais_aderencia": sinais, "evidencia": evidencia, "motivo": motivo
             }
         }
 
@@ -413,7 +412,7 @@ class Executor:
                 return {
                     "status": "bloqueado",
                     "acao": "preparar_abordagem",
-                    "motivo": "A abordagem foi bloqueada porque o alvo nao apresentou evidencia publica suficiente do problema."
+                    "motivo": "A abordagem foi bloqueada porque o alvo nao apresentou evidencia publica suficiente de aderencia ao nicho e à atividade pesquisada."
                 }
             url_alvo = (validacao.get("url_alvo") or url_alvo).strip()
             canal = validacao.get("canal") or canal
