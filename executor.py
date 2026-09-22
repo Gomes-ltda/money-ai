@@ -436,12 +436,24 @@ class Executor:
         )
         contexto = {"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste"), "url_alvo": url_alvo}
         leads = obter_leads(limite=100)
+        lead_encontrado = None
         for lead in reversed(leads):
             lead_url = (lead.get("url") or "").strip()
             if lead_url == url_alvo or (lead.get("nome") == cliente and lead.get("estrategia") == decisao.get("estrategia")):
+                lead_encontrado = lead
                 contexto["lead_id"] = lead.get("id")
                 contexto["evidencia_alvo"] = lead.get("evidencia_publica") or []
                 break
+
+        # A flag recebida pela IA não substitui o estado persistido do funil.
+        # Somente um lead realmente marcado como "validado" pode gerar abordagem.
+        if not lead_encontrado or lead_encontrado.get("status") != "validado":
+            return {
+                "status": "bloqueado",
+                "acao": "preparar_abordagem",
+                "motivo": "A abordagem exige um lead persistido com status 'validado'."
+            }
+
         existentes = obter_acoes_externas(limite=100)
         for existente in reversed(existentes):
             contexto_existente = existente.get("contexto") or {}
