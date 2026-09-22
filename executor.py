@@ -7,7 +7,7 @@ from memory import registrar_evento, registrar_teste, registrar_acao_externa, ob
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "preparar_abordagem", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
+    "criar_proposta", "criar_conteudo", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
 }
 
 def agora():
@@ -46,6 +46,12 @@ class Executor:
                 resultado = self.validar_alvo(decisao)
             elif acao == "preparar_abordagem":
                 resultado = self.preparar_abordagem(decisao)
+            elif acao == "preparar_followup":
+                resultado = self.preparar_followup(decisao)
+            elif acao == "acompanhar_lead":
+                resultado = self.acompanhar_lead(decisao)
+            elif acao == "medir_resultado":
+                resultado = self.medir_resultado(decisao)
             elif acao == "testar_estrategia":
                 resultado = self.testar_estrategia(decisao)
             else:
