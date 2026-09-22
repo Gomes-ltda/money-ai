@@ -661,14 +661,15 @@ def pedido_publico(token):
     status = pedido.get("status", "recebido")
     labels = {
         "recebido":"Solicitação recebida","em_analise":"Em análise",
-        "proposta_preparada":"Proposta preparada",
+        "proposta_preparada":"Proposta em preparação",
         "proposta_enviada":"Proposta disponível","aguardando_pagamento":"Aguardando confirmação",
         "em_execucao":"Em execução","entregue":"Entrega disponível","cancelado":"Pedido encerrado"
     }
     proposta = pedido.get("proposta") or {}
     entrega = pedido.get("entrega") or {}
     proposta_html = ""
-    if proposta.get("texto"):
+    proposta_publicada = status in {"proposta_enviada", "aguardando_pagamento", "em_execucao", "entregue"}
+    if proposta.get("texto") and proposta_publicada:
         texto = str(proposta.get("texto","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\n","<br>")
         proposta_html = "<div style='background:#f5f6f8;border-radius:14px;padding:18px;margin-top:20px'><h2>Proposta</h2><p>"+texto+"</p>"
         if proposta.get("valor") is not None:
@@ -775,7 +776,7 @@ def atualizar_pedido(pedido_id):
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     dados = request.get_json(silent=True) or {}
     status = str(dados.get("status", "")).strip() or None
-    permitidos = {"recebido","em_analise","proposta_enviada","aguardando_pagamento","em_execucao","entregue","cancelado"}
+    permitidos = {"recebido","em_analise","proposta_preparada","proposta_enviada","aguardando_pagamento","em_execucao","entregue","cancelado"}
     if status and status not in permitidos:
         return jsonify({"erro": "Status inválido."}), 400
     proposta = dados.get("proposta")
