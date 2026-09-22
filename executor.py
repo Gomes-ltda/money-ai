@@ -498,12 +498,54 @@ class Executor:
             ]
             if acoes_alvo:
                 acoes = acoes_alvo
+
         ultimo = acoes[-1] if acoes else None
         feedbacks = (ultimo or {}).get("feedback", []) or []
-        registrar_evento("acompanhamento_lead", "Estado comercial analisado para o alvo relevante.")
+        respostas = [f for a in feedbacks if f.get("resposta")]
+        interesses = [f for f in feedbacks if f.get("interesse")]
+        vendas = [f for f in feedbacks if f.get("venda")]
+
+        # O acompanhamento passa a produzir um estado comercial explícito.
+        # Isso permite ao próximo ciclo decidir entre esperar, avançar ou
+        # preparar follow-up sem tratar todo contato executado como lead frio.
+        if vendas:
+            fase = "venda"
+        elif interesses:
+            fase = "interesse"
+        elif respostas:
+            fase = "resposta"
+        elif ultimo and ultimo.get("status") == "executada":
+            fase = "aguardando_resposta"
+        elif ultimo and ultimo.get("status") in {"aguardando_autorizacao", "autorizada"}:
+            fase = "aguardando_contato"
+        elif ultimo:
+            fase = ultimo.get("status") or "em_acompanhamento"
+        else:
+            fase = "sem_contato"
+
+        lead_id = (ultimo.get("contexto") or {}).get("lead_id") if ultimo else None
+        if lead_id:
+            status_lead = {
+                "venda": "venda",
+                "interesse": "interesse",
+                "resposta": "resposta",
+                "aguardando_resposta": "contato_executado",
+                "aguardando_contato": "abordagem_preparada"
+            }.get(fase)
+            if status_lead:
+                atualizar_lead(
+                    lead_id,
+                    status=status_lead,
+                    ultima_acao_externa_id=ultimo.get("id"),
+                    fase_comercial=fase
+                )
+
+        registrar_evento("acompanhamento_lead", f"Estado comercial identificado: {fase}.")
         return {"status": "executado", "acao": "acompanhar_lead", "resultado": {
             "receita": 0, "custo": 0, "ultima_acao": ultimo,
-            "feedbacks": feedbacks, "acoes_analisadas": len(acoes)
+            "feedbacks": feedbacks, "fase_comercial": fase,
+            "respostas": len(respostas), "interesses": len(interesses),
+            "vendas": len(vendas), "acoes_analisadas": len(acoes)
         }}
 
     def preparar_followup(self, decisao):
@@ -525,6 +567,13 @@ class Executor:
         if not candidatas:
             return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "Não há abordagem executada disponível para o alvo relevante."}
         origem = candidatas[-1]
+
+        feedbacks_origem = origem.get("feedback", []) or []
+        if any(f.get("venda") for f in feedbacks_origem):
+            return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "A venda já foi confirmada; não criar follow-up comercial."}
+        if any(f.get("interesse") or f.get("resposta") for f in feedbacks_origem):
+            return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "O alvo já respondeu ou demonstrou interesse; o próximo passo deve tratar a resposta existente."}
+
         if origem.get("tipo") == "followup_comercial":
             return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "O último contato já foi um follow-up; aguarde novo feedback antes de criar outro."}
         if any(a.get("contexto", {}).get("acao_origem_id") == origem.get("id") for a in acoes):
