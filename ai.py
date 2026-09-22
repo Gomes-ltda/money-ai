@@ -260,6 +260,8 @@ AÇÕES DISPONÍVEIS AO EXECUTOR:
 - criar_proposta
 - criar_conteudo
 - preparar_abordagem
+- pesquisar_alvo
+- validar_alvo
 - testar_estrategia
 - acompanhar_lead
 - preparar_followup
@@ -289,7 +291,13 @@ Se for hora de produzir material:
 Se já existir uma estratégia pronta para teste:
 "testar_estrategia"
 
-Se a estratégia já tiver oferta, cliente-alvo, proposta e um alvo específico identificado, e também tiver um canal exatamente igual a "instagram", "linkedin", "whatsapp" ou "email", com uma URL pública e específica do alvo no campo "url_alvo":
+Se a oportunidade já estiver definida, mas ainda não houver um alvo público específico:
+"pesquisar_alvo"
+
+Se existir um alvo público encontrado, mas ainda faltar evidência suficiente para confirmar aderência ao problema:
+"validar_alvo"
+
+Se já existir uma estratégia com oferta, cliente-alvo, proposta e um alvo específico identificado, e também tiver um canal exatamente igual a "instagram", "linkedin", "whatsapp" ou "email", com uma URL pública e específica do alvo no campo "url_alvo":
 "preparar_abordagem"
 
 REGRAS OBRIGATÓRIAS PARA "preparar_abordagem":
