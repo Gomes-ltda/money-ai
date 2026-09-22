@@ -441,9 +441,12 @@ ADMIN_HTML = """
             const token = obterToken();
             if (!token) return;
             try {
-                const resposta = await fetch("/pedidos-clientes", {headers: {"Authorization": "Bearer " + token}});
+                const resposta = await fetch("/pedidos-clientes", {headers: {"Authorization": "Bearer " + token}, cache: "no-store"});
                 const dados = await resposta.json();
-                if (!resposta.ok) return;
+                if (!resposta.ok) {
+                    box.innerHTML = "<p>Não foi possível carregar os pedidos: " + escPedido(dados.erro || ("HTTP " + resposta.status)) + "</p>";
+                    return;
+                }
                 const pedidos = (dados.pedidos || []).slice().reverse();
                 if (!pedidos.length) { box.innerHTML = "<p>Nenhum pedido recebido ainda.</p>"; return; }
 
@@ -459,7 +462,7 @@ ADMIN_HTML = """
                     "cancelado":"Encerrado"
                 };
 
-                box.innerHTML = pedidos.slice(0,20).map(p => {
+                box.innerHTML = pedidos.map(p => {
                     const prop = p.proposta || {};
                     const escopo = Array.isArray(prop.escopo) ? prop.escopo : [];
                     const perguntas = Array.isArray(prop.perguntas) ? prop.perguntas : [];
@@ -992,7 +995,10 @@ def resolver_reclamacao(reclamacao_id):
 def pedidos_clientes():
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
-    return jsonify({"pedidos": obter_pedidos_clientes()})
+    pedidos = obter_pedidos_clientes(500)
+    resposta = jsonify({"pedidos": pedidos, "quantidade": len(pedidos)})
+    resposta.headers["Cache-Control"] = "no-store"
+    return resposta
 
 
 @app.route("/pedidos-clientes/<pedido_id>/ciclo", methods=["POST"])
