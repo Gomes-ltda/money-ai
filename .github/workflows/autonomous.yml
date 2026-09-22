@@ -8,6 +8,27 @@ jobs:
   cycle:
     runs-on: ubuntu-latest
     steps:
+      - name: Wait for Render
+        env:
+          EVOLIA_URL: ${{ secrets.EVOLIA_URL }}
+        run: |
+          set -e
+          test -n "$EVOLIA_URL"
+
+          echo "Aguardando a EVOLIA ficar online..."
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            HTTP_CODE=$(curl -sS --max-time 30 -o /tmp/health.txt -w "%{http_code}" "$EVOLIA_URL/health" || true)
+            echo "Health check $i: HTTP $HTTP_CODE"
+            if [ "$HTTP_CODE" = "200" ]; then
+              cat /tmp/health.txt
+              exit 0
+            fi
+            sleep 15
+          done
+
+          echo "A EVOLIA não ficou disponível a tempo."
+          exit 1
+
       - name: Run autonomous cycle
         env:
           EVOLIA_URL: ${{ secrets.EVOLIA_URL }}
@@ -20,13 +41,28 @@ jobs:
           URL="$EVOLIA_URL/ciclo-autonomo"
           AUTH="Authorization: Bearer $EVOLIA_CRON_TOKEN"
 
-          HTTP_CODE=$(curl -sS --max-time 120             -o /tmp/evolia-response.txt             -w "%{http_code}"             -X POST "$URL"             -H "$AUTH"             -H "Content-Type: application/json"             --data-binary '{"localizacao":"Brasil"}')
+          for i in 1 2 3 4 5; do
+            echo "Tentativa $i de executar o ciclo..."
+            HTTP_CODE=$(curl -sS --max-time 180               -o /tmp/evolia-response.txt               -w "%{http_code}"               -X POST "$URL"               -H "$AUTH"               -H "Content-Type: application/json"               --data-binary '{"localizacao":"Brasil"}' || true)
 
-          echo "HTTP $HTTP_CODE"
-          echo "Resposta da EVOLIA:"
-          cat /tmp/evolia-response.txt
+            echo "HTTP $HTTP_CODE"
+            echo "Resposta da EVOLIA:"
+            cat /tmp/evolia-response.txt || true
 
-          case "$HTTP_CODE" in
-            2*) ;;
-            *) exit 22 ;;
-          esac
+            case "$HTTP_CODE" in
+              2*)
+                exit 0
+                ;;
+              502|503|504)
+                echo "Render/proxy indisponível temporariamente. Aguardando antes de tentar novamente..."
+                sleep 20
+                ;;
+              *)
+                echo "Falha definitiva ou configuração incorreta."
+                exit 22
+                ;;
+            esac
+          done
+
+          echo "A EVOLIA não respondeu com sucesso após as tentativas."
+          exit 22
