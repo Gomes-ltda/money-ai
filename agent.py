@@ -19,7 +19,7 @@ from memory import (
 )
 
 ACOES_PERMITIDAS = {
-    "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "criar_oferta",
+    "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "criar_oferta",
     "criar_proposta", "criar_conteudo", "pesquisar_alvo", "validar_alvo", "preparar_abordagem", "testar_estrategia", "acompanhar_lead", "processar_resposta", "preparar_followup", "medir_resultado"
 }
 
@@ -285,13 +285,21 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
     # Antes de prospectar novamente, prioriza leads já em andamento.
     # A EVOLIA deve avançar o funil existente antes de criar trabalho novo.
     reclamacoes_abertas = obter_reclamacoes(limite=50, status="aberta")
+    reclamacoes_em_analise = obter_reclamacoes(limite=50, status="em_analise")
     if reclamacoes_abertas:
         reclamacao = reclamacoes_abertas[0]
         detalhes["reclamacao_id"] = reclamacao.get("id")
         detalhes["reclamacao_assunto"] = reclamacao.get("assunto")
         detalhes["reclamacao_descricao"] = reclamacao.get("descricao")
         acao_inicial = "analisar_reclamacao"
-        detalhes["motivo_escolha"] = "Existe uma reclamação aberta; tratar o problema do cliente antes de iniciar nova prospecção."
+        detalhes["motivo_escolha"] = "Existe uma reclamação aberta; analisar o problema do cliente antes de iniciar nova prospecção."
+    elif reclamacoes_em_analise:
+        reclamacao = reclamacoes_em_analise[0]
+        detalhes["reclamacao_id"] = reclamacao.get("id")
+        detalhes["reclamacao_assunto"] = reclamacao.get("assunto")
+        detalhes["reclamacao_descricao"] = reclamacao.get("descricao")
+        acao_inicial = "resolver_reclamacao"
+        detalhes["motivo_escolha"] = "Existe uma reclamação em análise; executar a providência possível antes de iniciar nova prospecção."
 
     leads_ativos = obter_leads_prioritarios(limite=20)
     if leads_ativos and acao_inicial in {
