@@ -1,4 +1,4 @@
-from ai import analisar_oportunidade
+from ai import analisar_oportunidade, analisar_pedido_cliente
 from executor import Executor
 from tasks import GerenciadorTarefas
 
@@ -11,7 +11,9 @@ from memory import (
     avaliar_estrategias,
     obter_ultimo_ciclo,
     obter_estado_comercial,
-    obter_leads
+    obter_leads,
+    obter_pedido_cliente,
+    atualizar_pedido_cliente
 )
 
 ACOES_PERMITIDAS = {
@@ -45,6 +47,109 @@ def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
         "estrategia_base": detalhes.get("estrategia_base"),
         "justificativa_evidencia": detalhes.get("justificativa_evidencia"),
         "proxima_acao_ciclo": detalhes.get("proxima_acao_ciclo")
+    }
+
+
+def executar_ciclo_pedido(pedido_id, localizacao="Brasil"):
+    """Executa o ciclo da EVOLIA especificamente para uma solicitação recebida."""
+    pedido = obter_pedido_cliente(pedido_id)
+    if not pedido:
+        return {"status": "erro", "erro": "Pedido não encontrado.", "pedido_id": pedido_id}
+
+    objetivo = (
+        "Atender o pedido do cliente de forma sustentável, definindo escopo, preço, prazo "
+        "e próximos passos com base nas informações fornecidas. Pedido: "
+        + str(pedido.get("servico") or "serviço")
+        + " — "
+        + str(pedido.get("descricao") or "")
+    )
+
+    resultado = analisar_pedido_cliente(pedido, localizacao=localizacao)
+    if resultado.get("status") != "sucesso":
+        atualizar_pedido_cliente(
+            pedido_id,
+            status="em_analise",
+            observacao="O ciclo foi iniciado, mas o Cérebro não conseguiu concluir a análise: "
+            + str(resultado.get("erro") or "erro desconhecido")
+        )
+        ciclo = registrar_ciclo(
+            objetivo=objetivo,
+            localizacao=localizacao,
+            pesquisa=resultado.get("fontes_utilizadas"),
+            analise=resultado,
+            decisao={"acao": "aguardar", "pedido_id": pedido_id, "motivo": "Análise indisponível."},
+            execucao={"acao": "analisar_pedido_cliente", "status": "bloqueado", "pedido_id": pedido_id},
+            medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "aguardando_cerebro"},
+            aprendizado="O pedido precisa ser reavaliado quando o Cérebro estiver disponível.",
+            proxima_acao="Retomar a análise deste pedido."
+        )
+        return {
+            "status": "aguardando_cerebro",
+            "pedido_id": pedido_id,
+            "pedido": obter_pedido_cliente(pedido_id),
+            "ciclo_memoria": ciclo,
+            "erro": resultado.get("erro")
+        }
+
+    analise = resultado.get("analise") or {}
+    proposta = {
+        "texto": analise.get("proposta_cliente") or analise.get("resumo") or "",
+        "valor": analise.get("valor_sugerido"),
+        "prazo": analise.get("prazo_sugerido"),
+        "escopo": analise.get("escopo") or [],
+        "nao_incluido": analise.get("nao_incluido") or [],
+        "perguntas": analise.get("perguntas") or [],
+        "justificativa_preco": analise.get("justificativa_preco"),
+        "riscos": analise.get("riscos") or [],
+        "confianca": analise.get("confianca"),
+        "modelo_utilizado": resultado.get("modelo_utilizado"),
+        "fontes_utilizadas": resultado.get("fontes_utilizadas") or []
+    }
+    atualizado = atualizar_pedido_cliente(
+        pedido_id,
+        status="proposta_preparada",
+        proposta=proposta,
+        observacao="Ciclo da EVOLIA concluído: proposta preparada e aguardando autorização para publicação ao cliente."
+    )
+
+    decisao = {
+        "acao": "analisar_pedido_cliente",
+        "pedido_id": pedido_id,
+        "estrategia": "atendimento de pedidos recebidos",
+        "cliente_alvo": pedido.get("nome"),
+        "problema": pedido.get("descricao"),
+        "oferta": pedido.get("servico"),
+        "proxima_acao_ciclo": "Revisar e, se estiver adequada, autorizar a publicação da proposta ao cliente."
+    }
+    execucao = {
+        "status": "executado",
+        "acao": "analisar_pedido_cliente",
+        "pedido_id": pedido_id,
+        "execucoes": [{
+            "status": "executado",
+            "acao": "analisar_pedido_cliente",
+            "pedido_id": pedido_id,
+            "resultado": {"proposta_preparada": True, "valor": proposta.get("valor"), "prazo": proposta.get("prazo")}
+        }]
+    }
+    ciclo = registrar_ciclo(
+        objetivo=objetivo,
+        localizacao=localizacao,
+        pesquisa=resultado.get("fontes_utilizadas"),
+        analise=resultado,
+        decisao=decisao,
+        execucao=execucao,
+        medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "proposta_preparada"},
+        aprendizado="O pedido foi transformado em uma proposta estruturada sem executar comunicação externa.",
+        proxima_acao="Revisar e autorizar a publicação da proposta ao cliente."
+    )
+    return {
+        "status": "proposta_preparada",
+        "pedido_id": pedido_id,
+        "pedido": atualizado,
+        "analise": analise,
+        "ciclo_memoria": ciclo,
+        "fontes_utilizadas": resultado.get("fontes_utilizadas") or []
     }
 
 
