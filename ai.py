@@ -300,6 +300,15 @@ Se existir um alvo público encontrado, mas ainda faltar evidência suficiente p
 Se já existir uma estratégia com oferta, cliente-alvo, proposta e um alvo específico identificado, e também tiver um canal exatamente igual a "instagram", "linkedin", "whatsapp" ou "email", com uma URL pública e específica do alvo no campo "url_alvo":
 "preparar_abordagem"
 
+Se houver abordagem externa já executada e ainda não houver resposta ou interesse registrado:
+"acompanhar_lead" antes de criar nova prospecção.
+
+Se houver abordagem executada sem resposta e já tiver passado tempo suficiente para acompanhamento, sem follow-up pendente ou já preparado:
+"preparar_followup". Essa ação apenas prepara o contato e aguarda autorização; nunca envie a mensagem.
+
+Se houver feedback comercial suficiente para medir receita, custos ou vendas:
+"medir_resultado". A medição é histórica e não representa receita nova do ciclo.
+
 REGRAS OBRIGATÓRIAS PARA "preparar_abordagem":
 - "canal" deve ser EXATAMENTE um destes valores: "instagram", "linkedin", "whatsapp" ou "email".
 - Não use descrições genéricas como "redes sociais", "mensagens diretas", "diretórios locais" ou "contato online".
