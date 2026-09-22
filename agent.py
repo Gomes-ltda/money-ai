@@ -245,6 +245,8 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
     receita = 0
     custo = 0
     for item in execucao.get("execucoes", [execucao]):
+        if item.get("acao") == "medir_resultado":
+            continue
         resultado_item = item.get("resultado", {})
         receita += resultado_item.get("receita", 0) or 0
         custo += resultado_item.get("custo", 0) or 0
