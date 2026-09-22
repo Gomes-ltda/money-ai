@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import requests
 
-from memory import registrar_pagamento, atualizar_pagamento, obter_pagamentos
+from memory import registrar_pagamento, atualizar_pagamento, obter_pagamentos, atualizar_pedido_cliente, obter_pedido_cliente
 
 
 MP_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN", "").strip()
@@ -254,6 +254,18 @@ def sincronizar_pagamento(pagamento_id):
         ultima_sincronizacao_em=agora()
     )
     final = next((x for x in obter_pagamentos() if str(x.get("id")) == str(pagamento_id)), existente)
+
+    # Liquidação do pagamento avança automaticamente o pedido vinculado.
+    pedido_id = final.get("pedido_id")
+    if pedido_id and final.get("status") == "pago":
+        pedido = obter_pedido_cliente(pedido_id)
+        if pedido and pedido.get("status") == "aguardando_pagamento":
+            atualizar_pedido_cliente(
+                pedido_id,
+                status="em_execucao",
+                observacao="Pagamento confirmado pelo provedor. Pedido avançado automaticamente para execução."
+            )
+
     return {"status": "sincronizado", "pagamento": final}
 
 
@@ -325,4 +337,16 @@ def processar_webhook(payload, data_id):
         (x for x in obter_pagamentos() if str(x.get("id")) == pagamento_id),
         existente
     )
+
+    # O webhook também fecha automaticamente a transição de pagamento -> execução.
+    pedido_id = final.get("pedido_id")
+    if pedido_id and final.get("status") == "pago":
+        pedido = obter_pedido_cliente(pedido_id)
+        if pedido and pedido.get("status") == "aguardando_pagamento":
+            atualizar_pedido_cliente(
+                pedido_id,
+                status="em_execucao",
+                observacao="Pagamento confirmado via webhook. Pedido avançado automaticamente para execução."
+            )
+
     return {"status": "processado", "pagamento": final}
