@@ -528,8 +528,12 @@ def obter_pedido_cliente(pedido_id):
     return None
 
 
-def atualizar_pedido_cliente(pedido_id, status=None, proposta=None, entrega=None, observacao=None):
+def atualizar_pedido_cliente(pedido_id, status=None, proposta=None, entrega=None, observacao=None, **campos):
     memoria = carregar_memoria()
+    permitidos = {
+        "aceite", "pagamento_id", "ciclo", "cancelamento",
+        "execucao", "cliente_confirmou", "ultima_decisao"
+    }
     for pedido in reversed(memoria["pedidos_clientes"]):
         if pedido.get("id") == pedido_id:
             if status is not None:
@@ -538,6 +542,9 @@ def atualizar_pedido_cliente(pedido_id, status=None, proposta=None, entrega=None
                 pedido["proposta"] = proposta
             if entrega is not None:
                 pedido["entrega"] = entrega
+            for chave, valor in campos.items():
+                if chave in permitidos and valor is not None:
+                    pedido[chave] = valor
             pedido["atualizado_em"] = agora()
             pedido.setdefault("historico", []).append({
                 "data": agora(),
