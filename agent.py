@@ -39,7 +39,8 @@ def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
         "motivo": motivo,
         "acao_sobre_estrategia": detalhes.get("acao_sobre_estrategia", "testar_nova"),
         "estrategia_base": detalhes.get("estrategia_base"),
-        "justificativa_evidencia": detalhes.get("justificativa_evidencia")
+        "justificativa_evidencia": detalhes.get("justificativa_evidencia"),
+        "proxima_acao_ciclo": detalhes.get("proxima_acao_ciclo")
     }
 
 
