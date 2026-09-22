@@ -427,17 +427,44 @@ class Executor:
     def acompanhar_lead(self, decisao):
         acoes = obter_acoes_externas(limite=100)
         estrategia = decisao.get("estrategia")
+        url_alvo = (decisao.get("url_alvo") or "").strip()
+        cliente = (decisao.get("cliente_alvo") or "").strip()
         if estrategia:
             acoes = [a for a in acoes if a.get("estrategia") == estrategia]
+        if url_alvo or cliente:
+            acoes_alvo = [
+                a for a in acoes
+                if (url_alvo and (a.get("contexto", {}).get("url_alvo") or "") == url_alvo)
+                or (cliente and (a.get("alvo") or "") == cliente)
+            ]
+            if acoes_alvo:
+                acoes = acoes_alvo
         ultimo = acoes[-1] if acoes else None
-        registrar_evento("acompanhamento_lead", "Estado comercial analisado.")
-        return {"status": "executado", "acao": "acompanhar_lead", "resultado": {"receita": 0, "custo": 0, "ultima_acao": ultimo, "acoes_analisadas": len(acoes)}}
+        feedbacks = (ultimo or {}).get("feedback", []) or []
+        registrar_evento("acompanhamento_lead", "Estado comercial analisado para o alvo relevante.")
+        return {"status": "executado", "acao": "acompanhar_lead", "resultado": {
+            "receita": 0, "custo": 0, "ultima_acao": ultimo,
+            "feedbacks": feedbacks, "acoes_analisadas": len(acoes)
+        }}
 
     def preparar_followup(self, decisao):
         acoes = obter_acoes_externas(limite=100)
         candidatas = [a for a in acoes if a.get("status") == "executada"]
+        estrategia = decisao.get("estrategia")
+        url_alvo = (decisao.get("url_alvo") or "").strip()
+        cliente = (decisao.get("cliente_alvo") or "").strip()
+        if estrategia:
+            candidatas = [a for a in candidatas if a.get("estrategia") == estrategia]
+        if url_alvo or cliente:
+            filtradas = [
+                a for a in candidatas
+                if (url_alvo and (a.get("contexto", {}).get("url_alvo") or "") == url_alvo)
+                or (cliente and (a.get("alvo") or "") == cliente)
+            ]
+            if filtradas:
+                candidatas = filtradas
         if not candidatas:
-            return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "Não há abordagem executada disponível."}
+            return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "Não há abordagem executada disponível para o alvo relevante."}
         origem = candidatas[-1]
         if origem.get("tipo") == "followup_comercial":
             return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "O último contato já foi um follow-up; aguarde novo feedback antes de criar outro."}
