@@ -195,16 +195,26 @@ def registrar_estrategia(nome, descricao, status="em_teste"):
     return estrategia
 
 
-def registrar_ciclo(objetivo, localizacao=None, pesquisa=None, analise=None, decisao=None, execucao=None, medicao=None):
+def registrar_ciclo(objetivo, localizacao=None, pesquisa=None, analise=None, decisao=None,
+                    execucao=None, medicao=None, aprendizado=None, proxima_acao=None):
     memoria = carregar_memoria()
     ciclo = {
         "data": agora(), "objetivo": objetivo, "localizacao": localizacao,
         "pesquisa": pesquisa, "analise": analise, "decisao": decisao,
-        "execucao": execucao, "medicao": medicao
+        "execucao": execucao, "medicao": medicao,
+        "aprendizado": aprendizado,
+        "proxima_acao": proxima_acao
     }
     memoria["ciclos"].append(ciclo)
     salvar_memoria(memoria)
     return ciclo
+
+
+def obter_ultimo_ciclo():
+    ciclos = carregar_memoria().get("ciclos", [])
+    if not ciclos:
+        return None
+    return ciclos[-1]
 
 
 def registrar_teste(estrategia, plano=None, restricoes=None, execucao=None, receita=0, custo=0, resultado=None, status="em_andamento", ciclo=None):
