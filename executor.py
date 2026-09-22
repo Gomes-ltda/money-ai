@@ -580,6 +580,16 @@ class Executor:
         if feedback.get("venda"):
             proximo_passo = "encaminhar para o ciclo de pedido, pagamento e entrega."
             fase = "venda"
+            lead_id = (origem.get("contexto") or {}).get("lead_id")
+            lead_venda = next((x for x in obter_leads(limite=100) if x.get("id") == lead_id), None)
+            if lead_venda:
+                try:
+                    from pedido_fluxo import criar_pedido_de_venda_lead
+                    pedido_resultado = criar_pedido_de_venda_lead(lead_venda, origem, feedback)
+                except Exception as erro:
+                    pedido_resultado = {"ok": False, "erro": str(erro)}
+            else:
+                pedido_resultado = {"ok": False, "erro": "Lead da venda não encontrado na memória."}
         elif feedback.get("interesse"):
             proximo_passo = "preparar proposta ou próximo passo comercial específico para o interesse demonstrado."
             fase = "interesse"
@@ -611,7 +621,8 @@ class Executor:
                 "acao_origem_id": origem.get("id"),
                 "feedback": feedback,
                 "proximo_passo": proximo_passo,
-                "contato_externo_automatico": False
+                "contato_externo_automatico": False,
+                "pedido": pedido_resultado if fase == "venda" else None
             }
         }
 
