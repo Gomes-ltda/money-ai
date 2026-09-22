@@ -19,7 +19,7 @@ from memory import (
 
 ACOES_PERMITIDAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "pesquisar_alvo", "validar_alvo", "preparar_abordagem", "testar_estrategia", "acompanhar_lead", "preparar_followup", "medir_resultado"
+    "criar_proposta", "criar_conteudo", "pesquisar_alvo", "validar_alvo", "preparar_abordagem", "testar_estrategia", "acompanhar_lead", "processar_resposta", "preparar_followup", "medir_resultado"
 }
 
 MAX_TAREFAS_POR_CICLO = 6
@@ -297,12 +297,9 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
         elif status_lead == "contato_executado":
             acao_inicial = "acompanhar_lead"
             detalhes["proxima_acao_ciclo"] = "Aguardar ou processar resposta do lead antes de nova prospecção."
-        elif status_lead == "resposta":
-            acao_inicial = "acompanhar_lead"
-            detalhes["proxima_acao_ciclo"] = "Tratar a resposta existente antes de procurar outro lead."
-        elif status_lead == "interesse":
-            acao_inicial = "acompanhar_lead"
-            detalhes["proxima_acao_ciclo"] = "Avançar a oportunidade interessada antes de abrir nova prospecção."
+        elif status_lead in {"resposta", "interesse"}:
+            acao_inicial = "processar_resposta"
+            detalhes["proxima_acao_ciclo"] = "Processar a resposta/interesse existente e definir o próximo passo comercial antes de nova prospecção."
 
         detalhes["url_alvo"] = detalhes.get("url_alvo") or lead_prioritario.get("url")
         detalhes["canal"] = detalhes.get("canal") or lead_prioritario.get("canal")
