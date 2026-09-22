@@ -166,12 +166,23 @@ class Executor:
 
         candidatos = []
         vistos = set()
+        urls_existentes = {
+            str(lead.get("url") or "").strip().rstrip("/").lower()
+            for lead in obter_leads(limite=500)
+            if lead.get("url")
+        }
+
+        def normalizar_url(url):
+            return str(url or "").strip().rstrip("/").lower()
 
         def adicionar_candidato(item, canal):
             url = (item.get("url") or "").strip()
-            if not url or url in vistos:
+            chave = normalizar_url(url)
+            if not chave or chave in vistos:
                 return
-            vistos.add(url)
+            vistos.add(chave)
+            if chave in urls_existentes:
+                return
             candidatos.append({
                 "url": url,
                 "titulo": item.get("titulo"),
@@ -430,9 +441,8 @@ class Executor:
         if not problema or not oferta or cliente == "cliente potencial":
             return {"status": "bloqueado", "acao": "preparar_abordagem", "motivo": "A oportunidade ainda não possui problema, oferta e alvo suficientemente definidos para uma abordagem."}
         mensagem = proposta_anterior or decisao.get("proposta") or (
-            f"Olá! Vi seu trabalho e identifiquei uma oportunidade relacionada a {decisao.get('problema', 'uma necessidade do seu negócio')}. "
-            f"Tenho uma proposta de teste pequeno para {decisao.get('oferta', 'uma solução específica')}. "
-            "Posso te explicar em poucas linhas?"
+            f"Olá! Vi seu trabalho e acredito que uma solução relacionada a {decisao.get('oferta', 'uma solução específica')} pode ser relevante para o seu contexto. "
+            "Tenho uma ideia de teste pequeno, sem compromisso. Posso te explicar em poucas linhas?"
         )
         contexto = {"objetivo": decisao.get("objetivo"), "nicho": decisao.get("nicho"), "problema": decisao.get("problema"), "oferta": decisao.get("oferta"), "preco_teste": decisao.get("preco_teste"), "url_alvo": url_alvo}
         leads = obter_leads(limite=100)
