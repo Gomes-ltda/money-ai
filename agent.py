@@ -14,7 +14,7 @@ from memory import (
 
 ACOES_PERMITIDAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "pesquisar_alvo", "preparar_abordagem", "testar_estrategia"
+    "criar_proposta", "criar_conteudo", "pesquisar_alvo", "validar_alvo", "preparar_abordagem", "testar_estrategia"
 }
 
 MAX_TAREFAS_POR_CICLO = 6
