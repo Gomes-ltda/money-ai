@@ -6,6 +6,7 @@ from agent import executar_ciclo, executar_ciclo_pedido
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
 from pagamentos import criar_cobranca_pix, criar_order_pix_teste, validar_webhook, processar_webhook, sincronizar_pagamento
+from pedido_fluxo import publicar_proposta, aceitar_proposta, criar_pagamento_pedido, sincronizar_pedido_pagamento, registrar_entrega, ciclo_pedido_resumo, transicionar_pedido
 from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca, obter_pagamento_por_id, registrar_pedido_cliente, obter_pedidos_clientes, obter_pedido_publico, atualizar_pedido_cliente
 
 
@@ -660,38 +661,92 @@ def pedido_publico(token):
 
     status = pedido.get("status", "recebido")
     labels = {
-        "recebido":"Solicitação recebida","em_analise":"Em análise",
+        "recebido":"Solicitação recebida",
+        "em_analise":"Em análise",
         "proposta_preparada":"Proposta em preparação",
-        "proposta_enviada":"Proposta disponível","aguardando_pagamento":"Aguardando confirmação",
-        "em_execucao":"Em execução","entregue":"Entrega disponível","cancelado":"Pedido encerrado"
+        "proposta_enviada":"Proposta disponível para sua decisão",
+        "aguardando_pagamento":"Aguardando pagamento",
+        "em_execucao":"Em execução",
+        "entregue":"Entrega disponível",
+        "cancelado":"Pedido encerrado"
     }
     proposta = pedido.get("proposta") or {}
     entrega = pedido.get("entrega") or {}
-    proposta_html = ""
     proposta_publicada = status in {"proposta_enviada", "aguardando_pagamento", "em_execucao", "entregue"}
+
+    nome_seguro = str(pedido.get("nome","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+    servico_seguro = str(pedido.get("servico","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+    texto = str(proposta.get("texto","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\n","<br>")
+    entrega_texto = str(entrega.get("texto","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+
+    proposta_html = ""
     if proposta.get("texto") and proposta_publicada:
-        texto = str(proposta.get("texto","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\n","<br>")
-        proposta_html = "<div style='background:#f5f6f8;border-radius:14px;padding:18px;margin-top:20px'><h2>Proposta</h2><p>"+texto+"</p>"
+        valor = proposta.get("valor")
+        valor_html = ("<p><strong>Valor:</strong> R$ " + str(valor) + "</p>") if valor is not None else ""
+        prazo_html = ("<p><strong>Prazo:</strong> " + str(proposta.get("prazo")) + "</p>") if proposta.get("prazo") else ""
+        proposta_html = "<div style='background:#f5f6f8;border-radius:14px;padding:18px;margin-top:20px'><h2>Proposta</h2><p>"+texto+"</p>"+valor_html+prazo_html+"</div>"
+
+    acao_html = ""
+    if status == "proposta_enviada":
         if proposta.get("valor") is not None:
-            proposta_html += "<p><strong>Valor:</strong> R$ "+str(proposta.get("valor"))+"</p>"
-        if proposta.get("prazo"):
-            proposta_html += "<p><strong>Prazo:</strong> "+str(proposta.get("prazo"))+"</p>"
-        proposta_html += "</div>"
+            acao_html = """
+            <div style='margin-top:20px;padding:18px;border:1px solid #ddd;border-radius:14px'>
+              <h2>Decisão</h2>
+              <p>Se a proposta estiver de acordo, você pode aceitá-la. O próximo passo será a cobrança.</p>
+              <button onclick="aceitarProposta()" style='background:#111;color:#fff;border:0;border-radius:10px;padding:13px 18px;cursor:pointer'>Aceitar proposta</button>
+              <div id='acaoStatus' style='margin-top:12px'></div>
+            </div>"""
+    elif status == "aguardando_pagamento":
+        acao_html = """
+        <div style='margin-top:20px;padding:18px;border:1px solid #ddd;border-radius:14px'>
+          <h2>Pagamento</h2>
+          <p>A proposta foi aceita. O pagamento é o próximo passo.</p>
+          <button onclick="gerarPagamento()" style='background:#111;color:#fff;border:0;border-radius:10px;padding:13px 18px;cursor:pointer'>Gerar Pix</button>
+          <div id='acaoStatus' style='margin-top:12px'></div>
+        </div>"""
+    elif status == "em_execucao":
+        acao_html = "<div style='margin-top:20px;padding:18px;border-radius:14px;background:#f5f6f8'><strong>Pagamento confirmado.</strong><p>A EVOLIA está na etapa de execução.</p></div>"
+    elif status == "entregue":
+        acao_html = "<div style='margin-top:20px;padding:18px;border-radius:14px;background:#eef7f0'><strong>Entrega concluída.</strong></div>"
+
     entrega_html = ""
     if entrega.get("texto"):
-        texto = str(entrega.get("texto","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-        entrega_html = "<div style='background:#eef7f0;border-radius:14px;padding:18px;margin-top:20px'><h2>Entrega</h2><div style='white-space:pre-wrap'>"+texto+"</div>"
+        entrega_html = "<div style='background:#eef7f0;border-radius:14px;padding:18px;margin-top:20px'><h2>Entrega</h2><div style='white-space:pre-wrap'>"+entrega_texto+"</div>"
         if entrega.get("url"):
             entrega_html += "<p><a href='"+str(entrega.get("url"))+"' target='_blank' rel='noopener'>Abrir resultado</a></p>"
         entrega_html += "</div>"
 
-    nome_seguro=str(pedido.get("nome","")).replace("<","&lt;").replace(">","&gt;")
-    servico_seguro=str(pedido.get("servico","")).replace("<","&lt;").replace(">","&gt;")
     return """<!doctype html><html lang='pt-BR'><head><meta name='viewport' content='width=device-width,initial-scale=1'><title>Evolia AI — Pedido</title></head>
 <body style='margin:0;background:#f5f6f8;font-family:Arial,sans-serif;color:#111'><main style='max-width:760px;margin:0 auto;padding:40px 20px'>
 <div style='background:#111;color:#fff;border-radius:18px;padding:24px'><strong style='font-size:24px'>Evolia AI</strong><p style='margin-bottom:0'>Acompanhamento do pedido</p></div>
-<div style='background:#fff;border:1px solid #ddd;border-radius:18px;padding:24px;margin-top:18px'><p style='color:#666'>Olá, """ + nome_seguro + """."</p><h1 style='font-size:30px'>""" + labels.get(status,status) + """</h1><p><strong>Serviço:</strong> """ + servico_seguro + """</p>""" + proposta_html + entrega_html + """<p style='color:#777;font-size:13px;margin-top:28px'>Este link é privado. Não compartilhe.</p></div></main></body></html>"""
-
+<div style='background:#fff;border:1px solid #ddd;border-radius:18px;padding:24px;margin-top:18px'>
+<p style='color:#666'>Olá, """ + nome_seguro + """."</p>
+<h1 style='font-size:30px'>""" + labels.get(status,status) + """</h1>
+<p><strong>Serviço:</strong> """ + servico_seguro + """</p>
+""" + proposta_html + acao_html + entrega_html + """
+<p style='color:#777;font-size:13px;margin-top:28px'>Este link é privado. Não compartilhe.</p>
+</div></main>
+<script>
+async function aceitarProposta(){
+ const box=document.getElementById('acaoStatus'); box.textContent='Registrando aceite...';
+ try{
+  const r=await fetch('/pedido/""" + token + """/aceitar',{method:'POST',headers:{'Content-Type':'application/json'}});
+  const d=await r.json(); if(!r.ok){box.textContent=d.erro||'Não foi possível registrar o aceite.';return;}
+  location.reload();
+ }catch(e){box.textContent='Erro de conexão.';}
+}
+async function gerarPagamento(){
+ const box=document.getElementById('acaoStatus'); box.textContent='Gerando cobrança Pix...';
+ try{
+  const r=await fetch('/pedido/""" + token + """/pagamento',{method:'POST',headers:{'Content-Type':'application/json'}});
+  const d=await r.json(); if(!r.ok){box.textContent=d.erro||'Não foi possível gerar a cobrança.';return;}
+  const p=d.pagamento||{}; let html='<p>Cobrança criada.</p>';
+  if(p.ticket_url) html+='<p><a href="'+p.ticket_url+'" target="_blank" rel="noopener">Abrir instruções do Pix</a></p>';
+  if(p.qr_code) html+='<textarea readonly style="width:100%;height:100px">'+p.qr_code+'</textarea>';
+  box.innerHTML=html;
+ }catch(e){box.textContent='Erro de conexão.';}
+}
+</script></body></html>"""
 
 @app.route("/pedidos-clientes")
 def pedidos_clientes():
@@ -719,18 +774,53 @@ def ciclo_pedido(pedido_id):
 def publicar_proposta_pedido(pedido_id):
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
-    pedido = obter_pedido_cliente(pedido_id)
+    resultado = publicar_proposta(pedido_id)
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
+
+
+@app.route("/pedidos-clientes/<pedido_id>/ciclo-resumo")
+def resumo_ciclo_pedido(pedido_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    resumo = ciclo_pedido_resumo(pedido_id)
+    if not resumo:
+        return jsonify({"erro": "Pedido não encontrado."}), 404
+    return jsonify(resumo)
+
+
+@app.route("/pedido/<token>/aceitar", methods=["POST"])
+def aceitar_pedido_publico(token):
+    pedido = obter_pedido_publico(token)
     if not pedido:
         return jsonify({"erro": "Pedido não encontrado."}), 404
-    proposta = pedido.get("proposta") or {}
-    if not proposta.get("texto"):
-        return jsonify({"erro": "A EVOLIA ainda não preparou uma proposta para este pedido."}), 409
-    atualizado = atualizar_pedido_cliente(
-        pedido_id,
-        status="proposta_enviada",
-        observacao="Proposta publicada na página privada do cliente após autorização do usuário."
-    )
-    return jsonify({"status": "proposta_enviada", "pedido": atualizado}), 200
+    resultado = aceitar_proposta(pedido.get("id"))
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
+
+
+@app.route("/pedido/<token>/pagamento", methods=["POST"])
+def pagamento_pedido_publico(token):
+    pedido = obter_pedido_publico(token)
+    if not pedido:
+        return jsonify({"erro": "Pedido não encontrado."}), 404
+    resultado = criar_pagamento_pedido(pedido.get("id"))
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
+
+
+@app.route("/pedidos-clientes/<pedido_id>/sincronizar", methods=["POST"])
+def sincronizar_pedido(pedido_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    resultado = sincronizar_pedido_pagamento(pedido_id)
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
+
+
+@app.route("/pedidos-clientes/<pedido_id>/entrega", methods=["POST"])
+def entregar_pedido(pedido_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    dados = request.get_json(silent=True) or {}
+    resultado = registrar_entrega(pedido_id, dados.get("texto"), dados.get("url"))
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
 
 
 @app.route("/pedidos-clientes/<pedido_id>/analisar", methods=["POST"])
@@ -775,14 +865,14 @@ def atualizar_pedido(pedido_id):
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     dados = request.get_json(silent=True) or {}
-    status = str(dados.get("status", "")).strip() or None
-    permitidos = {"recebido","em_analise","proposta_preparada","proposta_enviada","aguardando_pagamento","em_execucao","entregue","cancelado"}
-    if status and status not in permitidos:
-        return jsonify({"erro": "Status inválido."}), 400
+    if "status" in dados:
+        return jsonify({
+            "erro": "O status do pedido não é editável manualmente. Use o ciclo da EVOLIA ou a ação específica da etapa."
+        }), 409
     proposta = dados.get("proposta")
     entrega = dados.get("entrega")
     pedido = atualizar_pedido_cliente(
-        pedido_id, status=status,
+        pedido_id,
         proposta=proposta if isinstance(proposta, dict) else None,
         entrega=entrega if isinstance(entrega, dict) else None,
         observacao=dados.get("observacao")
@@ -790,6 +880,7 @@ def atualizar_pedido(pedido_id):
     if not pedido:
         return jsonify({"erro": "Pedido não encontrado."}), 404
     return jsonify({"status": "atualizado", "pedido": pedido})
+
 
 @app.route("/")
 def home():
