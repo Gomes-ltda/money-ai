@@ -171,14 +171,23 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
     acao_inicial = detalhes.get("acao_executor", decisao_ia.get("acao_executor"))
 
     # Reaproveita alvos já validados pela memória antes de iniciar nova prospecção.
-    if acao_inicial in {"preparar_abordagem", "validar_alvo"} and not detalhes.get("url_alvo"):
+    if acao_inicial in {"preparar_abordagem", "validar_alvo"}:
         leads_validos = [
             lead for lead in obter_leads(status="validado", limite=100)
             if not detalhes.get("estrategia") or lead.get("estrategia") == detalhes.get("estrategia")
         ]
-        if leads_validos:
+        url_atual = (detalhes.get("url_alvo") or "").strip()
+        cliente_atual = (detalhes.get("cliente_alvo") or "").strip()
+        lead = next(
+            (x for x in reversed(leads_validos)
+             if (url_atual and x.get("url") == url_atual)
+             or (not url_atual and cliente_atual and x.get("nome") == cliente_atual)),
+            None
+        )
+        if lead is None and not url_atual and leads_validos:
             lead = leads_validos[-1]
-            detalhes["url_alvo"] = lead.get("url")
+        if lead:
+            detalhes["url_alvo"] = detalhes.get("url_alvo") or lead.get("url")
             detalhes["canal"] = detalhes.get("canal") or lead.get("canal")
             detalhes["cliente_alvo"] = detalhes.get("cliente_alvo") or lead.get("nome")
             detalhes["alvo_validado"] = True
