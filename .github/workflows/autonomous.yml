@@ -16,7 +16,14 @@ jobs:
           set -e
           test -n "$EVOLIA_URL"
           test -n "$EVOLIA_CRON_TOKEN"
-          curl --fail-with-body --max-time 120 -X POST "$EVOLIA_URL/ciclo-autonomo" \
+          HTTP_CODE=$(curl -sS --max-time 120 -o /tmp/evolia-response.txt -w "%{http_code}" -X POST "$EVOLIA_URL/ciclo-autonomo" \
             -H "Authorization: Bearer $EVOLIA_CRON_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"localizacao":"Brasil"}'
+            -d '{"localizacao":"Brasil"}")
+          echo "HTTP $HTTP_CODE"
+          echo "Resposta da EVOLIA:"
+          cat /tmp/evolia-response.txt
+          case "$HTTP_CODE" in
+            2*) ;;
+            *) exit 22 ;;
+          esac
