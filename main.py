@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template_string
 import os
 
 from ai import analisar_oportunidade, analisar_pedido_cliente
-from agent import executar_ciclo
+from agent import executar_ciclo, executar_ciclo_pedido
 from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedback_acao_externa, obter_metricas_comerciais
 from external import iniciar_acao_autorizada, consultar_acao_externa
 from pagamentos import criar_cobranca_pix, criar_order_pix_teste, validar_webhook, processar_webhook, sincronizar_pagamento
@@ -391,6 +391,19 @@ ADMIN_HTML = """
                     "</p>";
             } catch (erro) {}
         }
+        function escPedido(x) {
+            return String(x == null ? "" : x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+        }
+        const statusPedidoLabel = {
+            "recebido":"Recebido",
+            "em_analise":"Em análise",
+            "proposta_preparada":"Proposta preparada pela EVOLIA",
+            "proposta_enviada":"Proposta publicada",
+            "aguardando_pagamento":"Aguardando pagamento",
+            "em_execucao":"Em execução",
+            "entregue":"Entregue",
+            "cancelado":"Encerrado"
+        };
         async function carregarPedidosClientes() {
             const box = document.getElementById("pedidosClientes");
             const token = obterToken();
@@ -402,43 +415,49 @@ ADMIN_HTML = """
                 const pedidos = (dados.pedidos || []).slice().reverse();
                 if (!pedidos.length) { box.innerHTML = "<p>Nenhum pedido recebido ainda.</p>"; return; }
                 box.innerHTML = pedidos.slice(0,20).map(p => {
-                    const prop = p.proposta || {}, ent = p.entrega || {};
-                    const esc = x => String(x || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-                    return "<div style='border:1px solid #ccc;padding:16px;margin:12px 0;border-radius:10px'>" +
-                    "<b>"+esc(p.nome)+"</b> · "+esc(p.status)+(p.modo_teste?" · TESTE":"")+
-                    "<p><b>Serviço:</b> "+esc(p.servico)+"<br><b>Contato:</b> "+esc(p.email || p.whatsapp || p.instagram || "-")+
-                    "<br><b>Pedido:</b> "+esc(p.descricao)+"</p>"+
-                    "<label>Status</label><select id='st-"+p.id+"'>"+
-                    ["recebido","em_analise","proposta_enviada","aguardando_pagamento","em_execucao","entregue","cancelado"].map(st=>"<option "+(p.status===st?"selected":"")+">"+st+"</option>").join("")+
-                    "</select><label>Proposta</label><textarea id='pt-"+p.id+"' placeholder='Escopo e condições'>"+esc(prop.texto)+"</textarea>"+
-                    "<label>Valor</label><input id='pv-"+p.id+"' type='number' min='0' step='0.01' value='"+esc(prop.valor)+"'>"+
-                    "<label>Prazo</label><input id='pp-"+p.id+"' value='"+esc(prop.prazo)+"' placeholder='Ex.: 3 dias úteis'>"+
-                    "<label>Entrega</label><textarea id='et-"+p.id+"' placeholder='Resultado entregue ao cliente'>"+esc(ent.texto)+"</textarea>"+
-                    "<label>Link da entrega (opcional)</label><input id='eu-"+p.id+"' value='"+esc(ent.url)+"' placeholder='https://...'>"+
-                    "<button onclick='analisarPedidoCliente(&quot;"+p.id+"&quot;)'>Analisar com a Evolia</button> <button onclick='salvarPedidoCliente(&quot;"+p.id+"&quot;)'>Salvar / publicar</button> <a href='/pedido/"+encodeURIComponent(p.token_publico)+"' target='_blank'>Abrir página do cliente</a></div>";
+                    const prop = p.proposta || {};
+                    const escopo = Array.isArray(prop.escopo) ? prop.escopo : [];
+                    const perguntas = Array.isArray(prop.perguntas) ? prop.perguntas : [];
+                    const valor = prop.valor != null ? "R$ " + Number(prop.valor).toLocaleString("pt-BR",{minimumFractionDigits:2}) : "A definir";
+                    const ciclo = p.ciclo || {};
+                    const status = statusPedidoLabel[p.status] || p.status || "Recebido";
+                    const podeProcessar = ["recebido","em_analise"].includes(p.status);
+                    const podePublicar = p.status === "proposta_preparada" && prop.texto;
+                    return "<div style='border:1px solid #ccc;padding:18px;margin:12px 0;border-radius:10px'>" +
+                    "<div style='font-size:18px'><b>"+escPedido(p.nome)+"</b> · "+escPedido(status)+(p.modo_teste?" · TESTE":"")+"</div>" +
+                    "<p><b>Serviço:</b> "+escPedido(p.servico)+"<br><b>Contato:</b> "+escPedido(p.email || p.whatsapp || p.instagram || "-")+
+                    "<br><b>Pedido:</b> "+escPedido(p.descricao)+"</p>" +
+                    (ciclo.data ? "<p class='info'><b>Último ciclo:</b> "+escPedido(ciclo.data)+"</p>" : "") +
+                    (prop.texto ? "<div style='background:#f6f6f6;border-radius:10px;padding:14px;margin-top:12px'>" +
+                        "<b>Proposta gerada pela EVOLIA</b><p style='white-space:pre-wrap'>"+escPedido(prop.texto)+"</p>" +
+                        "<p><b>Valor sugerido:</b> "+escPedido(valor)+"<br><b>Prazo:</b> "+escPedido(prop.prazo || "A definir")+"</p>" +
+                        (escopo.length ? "<p><b>Escopo:</b><br>• "+escopo.map(escPedido).join("<br>• ")+"</p>" : "") +
+                        (perguntas.length ? "<p><b>Pontos que ainda precisam de confirmação:</b><br>• "+perguntas.map(escPedido).join("<br>• ")+"</p>" : "") +
+                        "</div>" : "<p style='color:#666'>A EVOLIA ainda não preparou uma proposta para este pedido.</p>") +
+                    "<div style='margin-top:14px'>" +
+                    (podeProcessar ? "<button onclick='executarCicloPedido(&quot;"+p.id+"&quot;)'>Executar ciclo da EVOLIA</button>" : "") +
+                    (podePublicar ? " <button onclick='publicarPropostaPedido(&quot;"+p.id+"&quot;)'>Autorizar e publicar proposta</button>" : "") +
+                    " <a href='/pedido/"+encodeURIComponent(p.token_publico)+"' target='_blank'>Abrir página do cliente</a></div>" +
+                    (p.status === "proposta_preparada" ? "<p class='info'>A proposta foi preparada pelo ciclo. Nenhum contato externo foi feito; a publicação exige sua autorização.</p>" : "") +
+                    "</div>";
                 }).join("");
             } catch(e) {}
         }
-        async function analisarPedidoCliente(id) {
+        async function executarCicloPedido(id) {
             const token=obterToken();
             if (!token) return;
-            const resposta=await fetch("/pedidos-clientes/"+encodeURIComponent(id)+"/analisar",{method:"POST",headers:{"Authorization":"Bearer "+token}});
+            const resposta=await fetch("/pedidos-clientes/"+encodeURIComponent(id)+"/ciclo",{method:"POST",headers:{"Authorization":"Bearer "+token}});
             const dados=await resposta.json();
-            if(!resposta.ok){alert(dados.erro||"Não foi possível analisar o pedido.");return;}
-            const a=dados.analise||{};
-            if(a.proposta_cliente) document.getElementById("pt-"+id).value=a.proposta_cliente;
-            if(a.valor_sugerido !== null && a.valor_sugerido !== undefined) document.getElementById("pv-"+id).value=a.valor_sugerido;
-            if(a.prazo_sugerido) document.getElementById("pp-"+id).value=a.prazo_sugerido;
-            document.getElementById("st-"+id).value="em_analise";
-            alert("Análise concluída. Revise a proposta antes de publicar.");
+            if(!resposta.ok){alert(dados.erro||"Não foi possível executar o ciclo do pedido.");return;}
+            carregarPedidosClientes();
         }
-        async function salvarPedidoCliente(id) {
+        async function publicarPropostaPedido(id) {
             const token=obterToken();
-            const proposta={texto:document.getElementById("pt-"+id).value,valor:document.getElementById("pv-"+id).value?Number(document.getElementById("pv-"+id).value):null,prazo:document.getElementById("pp-"+id).value};
-            const entrega={texto:document.getElementById("et-"+id).value,url:document.getElementById("eu-"+id).value};
-            const resposta=await fetch("/pedidos-clientes/"+encodeURIComponent(id),{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify({status:document.getElementById("st-"+id).value,proposta:proposta,entrega:entrega,observacao:"Atualização pelo painel."})});
+            if (!token) return;
+            if (!confirm("Publicar a proposta na página privada do cliente?")) return;
+            const resposta=await fetch("/pedidos-clientes/"+encodeURIComponent(id)+"/publicar-proposta",{method:"POST",headers:{"Authorization":"Bearer "+token}});
             const dados=await resposta.json();
-            if(!resposta.ok){alert(dados.erro||"Não foi possível atualizar o pedido.");return;}
+            if(!resposta.ok){alert(dados.erro||"Não foi possível publicar a proposta.");return;}
             carregarPedidosClientes();
         }
         let intervaloAcoes = null;
@@ -614,10 +633,22 @@ def solicitar():
         nome=nome, email=email, whatsapp=whatsapp, instagram=instagram,
         servico=servico, descricao=descricao, modo_teste=bool(dados.get("modo_teste", True))
     )
+
+    # O pedido entra imediatamente no mesmo ciclo de decisão da EVOLIA.
+    # Se o Cérebro estiver indisponível, o pedido continua registrado e pode ser retomado pelo painel.
+    try:
+        ciclo_resultado = executar_ciclo_pedido(pedido["id"])
+    except Exception as erro:
+        ciclo_resultado = {"status": "erro", "erro": str(erro)}
+
     return jsonify({
-        "status": "recebido",
+        "status": "proposta_preparada" if ciclo_resultado.get("status") == "proposta_preparada" else "recebido",
         "pedido_id": pedido["id"],
-        "url_publica": request.host_url.rstrip("/") + "/pedido/" + pedido["token_publico"]
+        "url_publica": request.host_url.rstrip("/") + "/pedido/" + pedido["token_publico"],
+        "ciclo": {
+            "status": ciclo_resultado.get("status"),
+            "proposta_preparada": ciclo_resultado.get("status") == "proposta_preparada"
+        }
     }), 201
 
 
@@ -630,6 +661,7 @@ def pedido_publico(token):
     status = pedido.get("status", "recebido")
     labels = {
         "recebido":"Solicitação recebida","em_analise":"Em análise",
+        "proposta_preparada":"Proposta preparada",
         "proposta_enviada":"Proposta disponível","aguardando_pagamento":"Aguardando confirmação",
         "em_execucao":"Em execução","entregue":"Entrega disponível","cancelado":"Pedido encerrado"
     }
@@ -665,6 +697,39 @@ def pedidos_clientes():
     if not validar_token():
         return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
     return jsonify({"pedidos": obter_pedidos_clientes()})
+
+
+@app.route("/pedidos-clientes/<pedido_id>/ciclo", methods=["POST"])
+def ciclo_pedido(pedido_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    pedido = obter_pedido_cliente(pedido_id)
+    if not pedido:
+        return jsonify({"erro": "Pedido não encontrado."}), 404
+    resultado = executar_ciclo_pedido(pedido_id)
+    if resultado.get("status") == "proposta_preparada":
+        return jsonify(resultado), 200
+    if resultado.get("status") == "aguardando_cerebro":
+        return jsonify(resultado), 503
+    return jsonify(resultado), 500
+
+
+@app.route("/pedidos-clientes/<pedido_id>/publicar-proposta", methods=["POST"])
+def publicar_proposta_pedido(pedido_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    pedido = obter_pedido_cliente(pedido_id)
+    if not pedido:
+        return jsonify({"erro": "Pedido não encontrado."}), 404
+    proposta = pedido.get("proposta") or {}
+    if not proposta.get("texto"):
+        return jsonify({"erro": "A EVOLIA ainda não preparou uma proposta para este pedido."}), 409
+    atualizado = atualizar_pedido_cliente(
+        pedido_id,
+        status="proposta_enviada",
+        observacao="Proposta publicada na página privada do cliente após autorização do usuário."
+    )
+    return jsonify({"status": "proposta_enviada", "pedido": atualizado}), 200
 
 
 @app.route("/pedidos-clientes/<pedido_id>/analisar", methods=["POST"])
