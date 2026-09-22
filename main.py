@@ -103,7 +103,7 @@ ADMIN_HTML = """
     <div id="historicoAcoes"></div>
     <hr>
     <h2>Pedidos de clientes</h2>
-    <p>Cada solicitação entra no ciclo da EVOLIA. O sistema pesquisa, analisa e prepara a proposta; comunicação com o cliente continua dependendo da sua autorização.</p>
+    <p>Cada solicitação entra no ciclo da EVOLIA. Para pedidos recebidos, a análise e a publicação da proposta acontecem automaticamente. Autorizações manuais ficam reservadas às ações externas sensíveis, como prospecção.</p>
     <div id="pedidosClientes"></div>
 <hr>
     <h2>Pagamentos</h2>
@@ -880,7 +880,14 @@ def pedido_publico(token):
 <div id='reclamacaoStatus' style='margin-top:12px'></div></div></div><p style='color:#777;font-size:13px;margin-top:28px'>Este link é privado. Não compartilhe.</p>
 </div></main>
 <script>
-function abrirReclamacao(){document.getElementById('reclamacaoBox').style.display='block';}
+function abrirReclamacao(){document.getElementById('reclamacaoBox').style.display='block';}function acompanharPaginaPedido(){
+ const statusAtual="""" + status + """";
+ if(["recebido","em_analise","proposta_preparada","proposta_enviada","aguardando_pagamento","em_execucao"].includes(statusAtual)){
+  setInterval(async function(){try{const r=await fetch('/pedido/""" + token + """/dados',{cache:'no-store'});const d=await r.json();if(r.ok&&d.status!==statusAtual)location.reload();}catch(e){}},5000);
+ }
+}
+acompanharPaginaPedido();
+
 async function enviarReclamacao(){
  const box=document.getElementById('reclamacaoStatus'); const descricao=document.getElementById('reclamacaoDescricao').value.trim();
  if(!descricao){box.textContent='Descreva o problema antes de enviar.';return;} box.textContent='Enviando reclamação...';
