@@ -280,6 +280,20 @@ def registrar_lead(proveniencia, url, canal, nome=None, resumo=None, motivo_ader
 
     for lead in reversed(leads):
         if lead.get("url") == url and lead.get("estrategia") == estrategia:
+            # Atualiza evidências sem apagar um estado comercial mais avançado.
+            for chave, valor in {
+                "canal": canal,
+                "nome": str(nome or "").strip(),
+                "resumo": str(resumo or "").strip(),
+                "motivo_aderencia": str(motivo_aderencia or "").strip(),
+                "evidencia_publica": evidencia_publica or [],
+                "nicho": nicho,
+                "problema": problema,
+                "oferta": oferta,
+                "confianca": confianca
+            }.items():
+                if valor not in (None, "", []):
+                    lead[chave] = valor
             lead["atualizado_em"] = agora()
             return lead
 
