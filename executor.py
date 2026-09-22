@@ -7,7 +7,7 @@ from memory import registrar_evento, registrar_teste, registrar_acao_externa, ob
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
+    "criar_proposta", "criar_conteudo", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "processar_resposta", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
 }
 
 def agora():
@@ -50,6 +50,8 @@ class Executor:
                 resultado = self.preparar_followup(decisao)
             elif acao == "acompanhar_lead":
                 resultado = self.acompanhar_lead(decisao)
+            elif acao == "processar_resposta":
+                resultado = self.processar_resposta(decisao)
             elif acao == "medir_resultado":
                 resultado = self.medir_resultado(decisao)
             elif acao == "testar_estrategia":
@@ -547,6 +549,71 @@ class Executor:
             "respostas": len(respostas), "interesses": len(interesses),
             "vendas": len(vendas), "acoes_analisadas": len(acoes)
         }}
+
+    def processar_resposta(self, decisao):
+        """Interpreta feedback já registrado e define o próximo passo sem contato externo automático."""
+        acoes = obter_acoes_externas(limite=100)
+        estrategia = decisao.get("estrategia")
+        url_alvo = (decisao.get("url_alvo") or "").strip()
+        cliente = (decisao.get("cliente_alvo") or "").strip()
+
+        if estrategia:
+            acoes = [a for a in acoes if a.get("estrategia") == estrategia]
+        if url_alvo or cliente:
+            filtradas = [
+                a for a in acoes
+                if (url_alvo and (a.get("contexto", {}).get("url_alvo") or "") == url_alvo)
+                or (cliente and (a.get("alvo") or "") == cliente)
+            ]
+            if filtradas:
+                acoes = filtradas
+
+        candidatos = []
+        for acao in acoes:
+            for feedback in acao.get("feedback", []) or []:
+                candidatos.append((acao, feedback))
+
+        if not candidatos:
+            return {"status": "bloqueado", "acao": "processar_resposta", "motivo": "Não há resposta ou interesse registrado para processar."}
+
+        origem, feedback = candidatos[-1]
+        if feedback.get("venda"):
+            proximo_passo = "encaminhar para o ciclo de pedido, pagamento e entrega."
+            fase = "venda"
+        elif feedback.get("interesse"):
+            proximo_passo = "preparar proposta ou próximo passo comercial específico para o interesse demonstrado."
+            fase = "interesse"
+        elif feedback.get("resposta"):
+            proximo_passo = "analisar a resposta e preparar uma resposta comercial adequada; não enviar automaticamente."
+            fase = "resposta"
+        else:
+            proximo_passo = "aguardar novo sinal do lead."
+            fase = "aguardando_resposta"
+
+        lead_id = (origem.get("contexto") or {}).get("lead_id")
+        if lead_id:
+            atualizar_lead(
+                lead_id,
+                status=fase,
+                ultima_acao_externa_id=origem.get("id"),
+                fase_comercial=fase,
+                proxima_acao=proximo_passo
+            )
+
+        registrar_evento("processamento_resposta", f"Próximo passo comercial definido: {fase}.")
+        return {
+            "status": "executado",
+            "acao": "processar_resposta",
+            "resultado": {
+                "receita": 0,
+                "custo": 0,
+                "fase_comercial": fase,
+                "acao_origem_id": origem.get("id"),
+                "feedback": feedback,
+                "proximo_passo": proximo_passo,
+                "contato_externo_automatico": False
+            }
+        }
 
     def preparar_followup(self, decisao):
         acoes = obter_acoes_externas(limite=100)
