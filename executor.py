@@ -402,6 +402,39 @@ class Executor:
         )
         registrar_evento("abordagem_preparada", f"Abordagem preparada para {cliente} no canal {canal}; aguardando autorização.")
         return {"status": "executado", "acao": "preparar_abordagem", "resultado": {"receita": 0, "custo": 0, "acao_externa_id": acao["id"], "status_acao_externa": acao["status"], "alvo": cliente, "canal": canal, "mensagem": mensagem}}
+    def acompanhar_lead(self, decisao):
+        acoes = obter_acoes_externas(limite=100)
+        estrategia = decisao.get("estrategia")
+        if estrategia:
+            acoes = [a for a in acoes if a.get("estrategia") == estrategia]
+        ultimo = acoes[-1] if acoes else None
+        registrar_evento("acompanhamento_lead", "Estado comercial analisado.")
+        return {"status": "executado", "acao": "acompanhar_lead", "resultado": {"receita": 0, "custo": 0, "ultima_acao": ultimo, "acoes_analisadas": len(acoes)}}
+
+    def preparar_followup(self, decisao):
+        acoes = obter_acoes_externas(limite=100)
+        candidatas = [a for a in acoes if a.get("status") == "executada"]
+        if not candidatas:
+            return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "Não há abordagem executada disponível."}
+        origem = candidatas[-1]
+        mensagem = "Olá! Passando para acompanhar nossa conversa. Se ainda fizer sentido, posso apresentar rapidamente a proposta."
+        contexto = dict(origem.get("contexto") or {})
+        contexto["acao_origem_id"] = origem.get("id")
+        nova = registrar_acao_externa("followup_comercial", origem.get("alvo"), origem.get("canal"), mensagem, origem.get("estrategia"), contexto)
+        registrar_evento("followup_preparado", "Follow-up preparado; aguardando autorização.")
+        return {"status": "executado", "acao": "preparar_followup", "resultado": {"receita": 0, "custo": 0, "acao_externa_id": nova["id"], "status_acao_externa": nova["status"], "acao_origem_id": origem.get("id"), "mensagem": mensagem}}
+
+    def medir_resultado(self, decisao):
+        acoes = obter_acoes_externas(limite=100)
+        estrategia = decisao.get("estrategia")
+        if estrategia:
+            acoes = [a for a in acoes if a.get("estrategia") == estrategia]
+        receita = sum(float(f.get("receita") or 0) for a in acoes for f in (a.get("feedback") or []))
+        custo = sum(float(f.get("custo") or 0) for a in acoes for f in (a.get("feedback") or []))
+        vendas = sum(bool(f.get("venda")) for a in acoes for f in (a.get("feedback") or []))
+        registrar_evento("medicao_comercial", "Resultado comercial medido.")
+        return {"status": "executado", "acao": "medir_resultado", "resultado": {"receita": receita, "custo": custo, "resultado": receita - custo, "vendas": int(vendas), "acoes_analisadas": len(acoes)}}
+
     def testar_estrategia(self, decisao):
         anterior = decisao.get("resultado_anterior") or {}
         proposta_anterior = anterior.get("resultado", {}).get("proposta") if isinstance(anterior, dict) else None
