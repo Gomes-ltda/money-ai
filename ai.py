@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 
 from pesquisa import pesquisar_varias
-from memory import obter_ultimos_aprendizados, obter_contexto_estrategico, avaliar_estrategias, obter_metricas_comerciais, obter_ultimo_ciclo, obter_estado_comercial
+from memory import obter_ultimos_aprendizados, obter_contexto_estrategico, avaliar_estrategias, obter_metricas_comerciais, obter_ultimo_ciclo, obter_estado_comercial, obter_leads
 
 
 GEMINI_API_KEY = os.getenv(
@@ -118,6 +118,7 @@ def analisar_oportunidade(
     metricas_comerciais = obter_metricas_comerciais()
     ciclo_anterior = obter_ultimo_ciclo()
     estado_comercial = obter_estado_comercial()
+    leads_memoria = obter_leads(limite=20)
 
     # =========================================================
     # 2. PESQUISA
@@ -192,6 +193,9 @@ CICLO IMEDIATAMENTE ANTERIOR:
 
 ESTADO ATUAL DO FUNIL COMERCIAL:
 {json.dumps(estado_comercial, ensure_ascii=False, indent=2)}
+
+LEADS PERSISTIDOS NA MEMÓRIA:
+{json.dumps(leads_memoria, ensure_ascii=False, indent=2)}
 
 REGRA DO FUNIL:
 O estado comercial representa o progresso real. Se houver ação aguardando autorização, aguarde em vez de criar outro alvo equivalente. Se houver ação executada sem resposta, priorize acompanhamento antes de reiniciar a prospecção. Se houver interesse, avance para proposta. Se houver venda confirmada, priorize medição e expansão.
