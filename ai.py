@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 
 from pesquisa import pesquisar_varias
-from memory import obter_ultimos_aprendizados, obter_contexto_estrategico, avaliar_estrategias, obter_metricas_comerciais
+from memory import obter_ultimos_aprendizados, obter_contexto_estrategico, avaliar_estrategias, obter_metricas_comerciais, obter_ultimo_ciclo
 
 
 GEMINI_API_KEY = os.getenv(
@@ -116,6 +116,7 @@ def analisar_oportunidade(
     contexto_estrategico = obter_contexto_estrategico()
     avaliacao_estrategias = avaliar_estrategias()
     metricas_comerciais = obter_metricas_comerciais()
+    ciclo_anterior = obter_ultimo_ciclo()
 
     # =========================================================
     # 2. PESQUISA
@@ -153,6 +154,12 @@ def analisar_oportunidade(
         indent=2
     )
 
+    ciclo_anterior_texto = json.dumps(
+        ciclo_anterior or {},
+        ensure_ascii=False,
+        indent=2
+    )
+
     # =========================================================
     # 4. PROMPT DO CÉREBRO
     # =========================================================
@@ -178,6 +185,12 @@ DESEMPENHO E RESULTADOS DOS TESTES:
 
 AVALIAÇÃO OBJETIVA DAS ESTRATÉGIAS:
 {json.dumps(avaliacao_estrategias, ensure_ascii=False, indent=2)}
+
+CICLO IMEDIATAMENTE ANTERIOR:
+{ciclo_anterior_texto}
+
+REGRA DO CICLO:
+O ciclo anterior é a experiência mais recente da Evolia. Não reinicie o processo do zero. Determine o que aconteceu, quais evidências foram obtidas, o que não foi concluído e qual é a consequência lógica para ESTE ciclo. Se encontrou um alvo válido, avance; se não encontrou evidência suficiente, mude a pesquisa; se preparou uma ação externa, não duplique o alvo; se houve resultado financeiro positivo, aprofunde a estratégia; se houve perda financeira repetida, modifique a estratégia.
 
 Use o desempenho acima como evidência. Estratégias sem resultado financeiro positivo não devem ser tratadas como validadas. Resultados zero significam que ainda não houve receita real. Abordagens preparadas ou enviadas, sem resposta ou venda confirmada, não devem ser tratadas como receita. Testes internos com receita zero não são, por si só, fracassos financeiros. Se uma estratégia tiver evidência repetida de baixo desempenho, procure uma variação ou outra oportunidade em vez de repetir mecanicamente.
 
@@ -210,7 +223,9 @@ Você deve:
 10. definir a próxima ação executável;
 11. decidir qual ação o Executor deve realizar;
 12. quando escolher "preparar_abordagem", identificar uma URL pública e específica do alvo no campo "url_alvo";
-13. registrar o que deverá ser aprendido com o teste.
+13. registrar o que deverá ser aprendido com o teste;
+14. definir explicitamente a consequência do ciclo anterior para a decisão atual;
+15. explicar em "justificativa_evidencia" quais fatos do ciclo anterior e da memória sustentam a escolha.
 
 REGRA IMPORTANTE:
 
@@ -318,7 +333,8 @@ FORMATO:
         "acao_sobre_estrategia": "continuar|modificar|testar_nova|aguardar",
         "estrategia_base": "...",
         "justificativa_evidencia": "...",
-        "motivo_escolha": "..."
+        "motivo_escolha": "...",
+        "proxima_acao_ciclo": "..."
     }},
 
     "aprendizado_esperado": "...",
