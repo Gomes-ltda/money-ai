@@ -359,6 +359,17 @@ def registrar_acao_externa(tipo, alvo=None, canal=None, mensagem=None, estrategi
         "resultado": None
     }
     memoria["acoes_externas"].append(acao)
+
+    # Se a ação nasceu de um lead persistido, o funil avança imediatamente.
+    lead_id = (acao.get("contexto") or {}).get("lead_id")
+    if lead_id:
+        for lead in reversed(memoria.get("leads", [])):
+            if lead.get("id") == lead_id:
+                lead["status"] = "abordagem_preparada" if tipo == "abordagem_comercial" else "followup_preparado"
+                lead["ultima_acao_externa_id"] = acao["id"]
+                lead["atualizado_em"] = agora()
+                break
+
     salvar_memoria(memoria)
     return acao
 
