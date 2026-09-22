@@ -279,6 +279,45 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
     detalhes = dict(decisao_ia.get("decisao", {}) or {})
     acao_inicial = detalhes.get("acao_executor", decisao_ia.get("acao_executor"))
 
+    # Antes de prospectar novamente, prioriza leads já em andamento.
+    # A EVOLIA deve avançar o funil existente antes de criar trabalho novo.
+    leads_ativos = [
+        lead for lead in obter_leads(limite=100)
+        if lead.get("status") in {
+            "abordagem_preparada", "autorizado", "contato_executado",
+            "resposta", "interesse"
+        }
+    ]
+    if leads_ativos and acao_inicial in {
+        "pesquisar_alvo", "validar_alvo", "preparar_abordagem"
+    }:
+        lead_prioritario = leads_ativos[-1]
+        status_lead = lead_prioritario.get("status")
+        if status_lead == "abordagem_preparada":
+            acao_inicial = "aguardar"
+            detalhes["proxima_acao_ciclo"] = "Aguardar autorização para contato com o lead já preparado."
+        elif status_lead == "autorizado":
+            acao_inicial = "acompanhar_lead"
+            detalhes["proxima_acao_ciclo"] = "Acompanhar a execução e o retorno do contato autorizado."
+        elif status_lead == "contato_executado":
+            acao_inicial = "acompanhar_lead"
+            detalhes["proxima_acao_ciclo"] = "Aguardar ou processar resposta do lead antes de nova prospecção."
+        elif status_lead == "resposta":
+            acao_inicial = "acompanhar_lead"
+            detalhes["proxima_acao_ciclo"] = "Tratar a resposta existente antes de procurar outro lead."
+        elif status_lead == "interesse":
+            acao_inicial = "acompanhar_lead"
+            detalhes["proxima_acao_ciclo"] = "Avançar a oportunidade interessada antes de abrir nova prospecção."
+
+        detalhes["url_alvo"] = detalhes.get("url_alvo") or lead_prioritario.get("url")
+        detalhes["canal"] = detalhes.get("canal") or lead_prioritario.get("canal")
+        detalhes["cliente_alvo"] = detalhes.get("cliente_alvo") or lead_prioritario.get("nome")
+        detalhes["alvo_validado"] = status_lead in {
+            "abordagem_preparada", "autorizado", "contato_executado",
+            "resposta", "interesse"
+        }
+
+
     # Reaproveita alvos já validados pela memória antes de iniciar nova prospecção.
     if acao_inicial in {"preparar_abordagem", "validar_alvo"}:
         leads_validos = [
