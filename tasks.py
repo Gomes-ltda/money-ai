@@ -13,6 +13,9 @@ ACOES_INTERNAS = {
     "pesquisar_alvo",
     "validar_alvo",
     "preparar_abordagem",
+    "preparar_followup",
+    "acompanhar_lead",
+    "medir_resultado",
     "testar_estrategia"
 }
 
@@ -61,6 +64,12 @@ def criar_tarefas(decisao):
         # A abordagem depende de alvo encontrado e validado no mesmo ciclo.
         for acao_tarefa, descricao in CADEIA_PROCESSO[4:]:
             adicionar(acao_tarefa, descricao)
+    elif acao == "preparar_followup":
+        adicionar("preparar_followup", "Preparar acompanhamento de uma abordagem já executada.")
+    elif acao == "acompanhar_lead":
+        adicionar("acompanhar_lead", "Analisar o estado do lead e o próximo avanço comercial.")
+    elif acao == "medir_resultado":
+        adicionar("medir_resultado", "Medir receita, vendas e resultado da estratégia.")
     elif acao == "testar_estrategia":
         adicionar("testar_estrategia", "Registrar e estruturar o teste da estratégia.")
     else:
