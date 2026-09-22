@@ -423,6 +423,13 @@ class Executor:
             return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "Este contato já possui follow-up registrado."}
         mensagem = "Olá! Passando para acompanhar nossa conversa. Se ainda fizer sentido, posso apresentar rapidamente a proposta."
         contexto = dict(origem.get("contexto") or {})
+        if any(
+            a.get("tipo") == "followup_comercial"
+            and a.get("alvo") == origem.get("alvo")
+            and a.get("status") in {"aguardando_autorizacao", "autorizada", "executada"}
+            for a in acoes
+        ):
+            return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "Já existe follow-up ativo ou executado para este alvo."}
         contexto["acao_origem_id"] = origem.get("id")
         nova = registrar_acao_externa("followup_comercial", origem.get("alvo"), origem.get("canal"), mensagem, origem.get("estrategia"), contexto)
         registrar_evento("followup_preparado", "Follow-up preparado; aguardando autorização.")
