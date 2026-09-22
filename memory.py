@@ -716,7 +716,8 @@ def obter_contexto_estrategico(limite_resultados=10, limite_testes=10, limite_ap
         "desempenho_por_estrategia": estrategias,
         "avaliacao_de_estrategias": avaliar_estrategias(),
         "testes_recentes": testes,
-        "aprendizados_recentes": aprendizados
+        "aprendizados_recentes": aprendizados,
+        "estado_comercial": obter_estado_comercial()
     }
 
 
