@@ -334,12 +334,16 @@ class Executor:
             )
 
         registrar_evento("validacao_alvo", f"Alvo {'validado' if validado else 'nao validado'}: {url}")
+        lead_principal = resultado_anterior.get("lead_principal") or {}
         return {
             "status": "executado" if validado else "bloqueado",
             "acao": "validar_alvo",
             "resultado": {
                 "receita": 0, "custo": 0, "validado": validado,
-                "confianca": confianca, "url_alvo": url, "alvo": alvo,
+                "confianca": confianca, "url_alvo": url,
+                "canal": lead_principal.get("canal") or alvo.get("canal"),
+                "cliente_alvo": lead_principal.get("nome") or alvo.get("titulo"),
+                "alvo": alvo, "lead_principal": lead_principal,
                 "sinais_problema": sinais, "evidencia": evidencia, "motivo": motivo
             }
         }
@@ -373,6 +377,9 @@ class Executor:
                     "acao": "preparar_abordagem",
                     "motivo": "A abordagem foi bloqueada porque o alvo nao apresentou evidencia publica suficiente do problema."
                 }
+            url_alvo = (validacao.get("url_alvo") or url_alvo).strip()
+            canal = validacao.get("canal") or canal
+            cliente = validacao.get("cliente_alvo") or cliente
             alvo_ja_validado = True
         if not alvo_ja_validado:
             return {
