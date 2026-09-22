@@ -12,6 +12,7 @@ from memory import (
     obter_ultimo_ciclo,
     obter_estado_comercial,
     obter_leads,
+    obter_leads_prioritarios,
     obter_pedido_cliente,
     atualizar_pedido_cliente
 )
@@ -281,13 +282,7 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
 
     # Antes de prospectar novamente, prioriza leads já em andamento.
     # A EVOLIA deve avançar o funil existente antes de criar trabalho novo.
-    leads_ativos = [
-        lead for lead in obter_leads(limite=100)
-        if lead.get("status") in {
-            "abordagem_preparada", "autorizado", "contato_executado",
-            "resposta", "interesse"
-        }
-    ]
+    leads_ativos = obter_leads_prioritarios(limite=20)
     if leads_ativos and acao_inicial in {
         "pesquisar_alvo", "validar_alvo", "preparar_abordagem"
     }:
