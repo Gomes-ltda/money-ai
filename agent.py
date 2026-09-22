@@ -20,7 +20,7 @@ from memory import (
 
 ACOES_PERMITIDAS = {
     "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "pesquisar_alvo", "validar_alvo", "preparar_abordagem", "testar_estrategia", "acompanhar_lead", "processar_resposta", "preparar_followup", "medir_resultado"
+    "criar_proposta", "criar_conteudo", "executar_pedido", "pesquisar_alvo", "validar_alvo", "preparar_abordagem", "testar_estrategia", "acompanhar_lead", "processar_resposta", "preparar_followup", "medir_resultado"
 }
 
 MAX_TAREFAS_POR_CICLO = 6
@@ -38,6 +38,7 @@ def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
         "canal": detalhes.get("canal"),
         "url_alvo": detalhes.get("url_alvo"),
         "reclamacao_id": detalhes.get("reclamacao_id"),
+        "pedido_id": detalhes.get("pedido_id"),
         "alvo_validado": detalhes.get("alvo_validado", False),
         "evidencia_alvo_memoria": detalhes.get("evidencia_alvo_memoria", []),
         "preco_teste": detalhes.get("preco_teste"),
@@ -284,6 +285,16 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
 
     # Antes de prospectar novamente, prioriza leads já em andamento.
     # A EVOLIA deve avançar o funil existente antes de criar trabalho novo.
+    pedidos_em_execucao = [p for p in __import__("memory").obter_pedidos_clientes(100) if p.get("status") == "em_execucao"]
+    if pedidos_em_execucao:
+        pedido = pedidos_em_execucao[0]
+        detalhes["pedido_id"] = pedido.get("id")
+        detalhes["cliente_alvo"] = pedido.get("nome")
+        detalhes["oferta"] = pedido.get("servico")
+        detalhes["problema"] = pedido.get("descricao")
+        acao_inicial = "executar_pedido"
+        detalhes["motivo_escolha"] = "Existe pedido pago em execução; produzir o resultado antes de iniciar novo trabalho comercial."
+
     reclamacoes_abertas = obter_reclamacoes(limite=50, status="aberta")
     reclamacoes_em_analise = obter_reclamacoes(limite=50, status="em_analise")
     if reclamacoes_abertas:
