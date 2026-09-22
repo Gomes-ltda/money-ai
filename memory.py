@@ -331,6 +331,26 @@ def obter_leads(status=None, limite=50):
     return leads[-limite:]
 
 
+
+def obter_leads_prioritarios(limite=20):
+    """Retorna leads em andamento na ordem de prioridade comercial."""
+    ordem = {
+        "venda": 0,
+        "interesse": 1,
+        "resposta": 2,
+        "autorizado": 3,
+        "contato_executado": 4,
+        "abordagem_preparada": 5,
+        "followup_preparado": 6,
+        "validado": 7,
+        "encontrado": 8,
+    }
+    leads = carregar_memoria().get("leads", [])
+    ativos = [lead for lead in leads if lead.get("status") in ordem]
+    ativos.sort(key=lambda lead: (ordem.get(lead.get("status"), 99), lead.get("atualizado_em") or lead.get("criado_em") or ""))
+    return ativos[:limite]
+
+
 def atualizar_lead(lead_id, status=None, **campos):
     memoria = carregar_memoria()
     for lead in reversed(memoria.get("leads", [])):
