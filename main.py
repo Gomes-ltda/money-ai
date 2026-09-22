@@ -731,20 +731,16 @@ def solicitar():
         servico=servico, descricao=descricao, modo_teste=bool(dados.get("modo_teste", True))
     )
 
-    # O pedido entra imediatamente no mesmo ciclo de decisão da EVOLIA.
-    # Se o Cérebro estiver indisponível, o pedido continua registrado e pode ser retomado pelo painel.
-    try:
-        ciclo_resultado = executar_ciclo_pedido(pedido["id"])
-    except Exception as erro:
-        ciclo_resultado = {"status": "erro", "erro": str(erro)}
-
+    # O pedido é registrado primeiro e a resposta é devolvida imediatamente.
+    # O ciclo da EVOLIA continua pelo processamento operacional, sem bloquear o formulário do cliente.
+    url_publica = request.host_url.rstrip("/") + "/pedido/" + pedido["token_publico"]
     return jsonify({
-        "status": "proposta_preparada" if ciclo_resultado.get("status") == "proposta_preparada" else "recebido",
+        "status": "recebido",
         "pedido_id": pedido["id"],
-        "url_publica": request.host_url.rstrip("/") + "/pedido/" + pedido["token_publico"],
+        "url_publica": url_publica,
         "ciclo": {
-            "status": ciclo_resultado.get("status"),
-            "proposta_preparada": ciclo_resultado.get("status") == "proposta_preparada"
+            "status": "pendente",
+            "proposta_preparada": False
         }
     }), 201
 
