@@ -341,7 +341,7 @@ class Executor:
             )
 
         registrar_evento("validacao_alvo", f"Alvo {'validado' if validado else 'nao validado'}: {url}")
-        lead_principal = resultado_anterior.get("lead_principal") or {}
+        lead_principal = lead
         return {
             "status": "executado" if validado else "bloqueado",
             "acao": "validar_alvo",
@@ -481,7 +481,12 @@ class Executor:
         contexto = dict(origem.get("contexto") or {})
         if any(
             a.get("tipo") == "followup_comercial"
-            and a.get("alvo") == origem.get("alvo")
+            and a.get("estrategia") == origem.get("estrategia")
+            and (
+                a.get("alvo") == origem.get("alvo")
+                or ((a.get("contexto") or {}).get("url_alvo") and
+                    (a.get("contexto") or {}).get("url_alvo") == (origem.get("contexto") or {}).get("url_alvo"))
+            )
             and a.get("status") in {"aguardando_autorizacao", "autorizada", "executada"}
             for a in acoes
         ):
