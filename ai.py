@@ -84,6 +84,93 @@ def _gerar_openai(prompt):
     except Exception as erro:
         return None, OPENAI_MODEL, str(erro)
 
+def gerar_resultado_servico(pedido):
+    """Produz o conteúdo real do serviço contratado usando o provedor de IA configurado."""
+    pedido = pedido or {}
+    provider = AI_PROVIDER if AI_PROVIDER in {"auto", "gemini", "openai"} else "auto"
+    if provider == "gemini" and not GEMINI_API_KEY:
+        return {"status": "erro_configuracao", "erro": "GEMINI_API_KEY não configurada."}
+    if provider == "openai" and not OPENAI_API_KEY:
+        return {"status": "erro_configuracao", "erro": "OPENAI_API_KEY não configurada."}
+    if provider == "auto" and not GEMINI_API_KEY and not OPENAI_API_KEY:
+        return {"status": "erro_configuracao", "erro": "Nenhum provedor de IA configurado."}
+
+    servico = str(pedido.get("servico") or "").strip()
+    descricao = str(pedido.get("descricao") or "").strip()
+    proposta = pedido.get("proposta") or {}
+    escopo = proposta.get("escopo") or []
+    nao_incluido = proposta.get("nao_incluido") or []
+
+    prompt = f"""
+Você é o executor de serviços da EVOLIA AI.
+Produza o resultado REAL do serviço contratado abaixo.
+
+SERVIÇO:
+{servico}
+
+DESCRIÇÃO DO CLIENTE:
+{descricao}
+
+ESCOPO CONTRATADO:
+{json.dumps(escopo, ensure_ascii=False, indent=2)}
+
+NÃO INCLUÍDO:
+{json.dumps(nao_incluido, ensure_ascii=False, indent=2)}
+
+Regras obrigatórias:
+- Entregue somente o que estiver dentro do escopo.
+- Não invente dados, pesquisas, métricas, clientes, resultados ou fontes.
+- Se o serviço exigir informação que não foi fornecida, deixe essa limitação explícita no resultado.
+- O texto deve ser utilizável pelo cliente, não uma explicação sobre como produzir o serviço.
+- Não diga que enviou algo externamente.
+- Não marque o trabalho como pago ou entregue; apenas produza o resultado.
+- Retorne JSON válido.
+
+Formato:
+{{
+  "titulo": "...",
+  "resumo": "...",
+  "entrega": "...",
+  "itens_entregues": ["..."],
+  "limitacoes": ["..."],
+  "fontes": [],
+  "confianca": "baixa|media|alta"
+}}
+"""
+
+    dados = None
+    modelo_usado = None
+    erro = None
+
+    if provider in {"auto", "gemini"} and GEMINI_API_KEY:
+        try:
+            cliente = genai.Client(api_key=GEMINI_API_KEY)
+            dados, modelo_usado, erro = _gerar_json(cliente, prompt)
+        except Exception as exc:
+            erro = str(exc)
+
+    if dados is None and provider in {"auto", "openai"}:
+        dados, modelo_usado, erro_openai = _gerar_openai(prompt)
+        if dados is not None:
+            erro = None
+        else:
+            erro = erro_openai or erro
+
+    if dados is None:
+        return {"status": "erro_producao", "erro": erro or "Não foi possível produzir o serviço."}
+
+    entrega = str(dados.get("entrega") or "").strip()
+    itens = dados.get("itens_entregues") or []
+    if not entrega or not itens:
+        return {"status": "erro_validacao", "erro": "O provedor retornou um resultado sem conteúdo suficiente.", "dados": dados}
+
+    return {
+        "status": "sucesso",
+        "modelo_utilizado": modelo_usado,
+        "resultado": dados
+    }
+
+
 def analisar_oportunidade(
     objetivo,
     localizacao="Brasil",
