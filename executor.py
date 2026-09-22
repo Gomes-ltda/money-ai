@@ -417,6 +417,10 @@ class Executor:
         if not candidatas:
             return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "Não há abordagem executada disponível."}
         origem = candidatas[-1]
+        if origem.get("tipo") == "followup_comercial":
+            return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "O último contato já foi um follow-up; aguarde novo feedback antes de criar outro."}
+        if any(a.get("contexto", {}).get("acao_origem_id") == origem.get("id") for a in acoes):
+            return {"status": "bloqueado", "acao": "preparar_followup", "motivo": "Este contato já possui follow-up registrado."}
         mensagem = "Olá! Passando para acompanhar nossa conversa. Se ainda fizer sentido, posso apresentar rapidamente a proposta."
         contexto = dict(origem.get("contexto") or {})
         contexto["acao_origem_id"] = origem.get("id")
