@@ -145,11 +145,15 @@ class Executor:
         nicho = decisao.get("nicho") or ""
         localizacao = decisao.get("localizacao", "Brasil")
 
+        termos_busca = " ".join(
+            palavra for palavra in str(nicho or "").replace(",", " ").split()
+            if len(palavra.strip()) >= 4
+        ).strip()
         consultas = [
-            f'"{cliente}" {nicho} perfil Instagram Brasil site:instagram.com',
-            f'"{cliente}" {nicho} LinkedIn Brasil site:linkedin.com/in/',
-            f'"{cliente}" {nicho} WhatsApp Brasil site:wa.me',
-            f'"{cliente}" {nicho} contato WhatsApp Brasil',
+            f'site:linkedin.com/in/ {termos_busca} Brasil consultor fundador consultoria',
+            f'site:linkedin.com/in/ {termos_busca} Brasil vendas gestão processos',
+            f'site:linkedin.com/in/ {termos_busca} Brasil "co-fundador" OR "fundador"',
+            f'site:linkedin.com/in/ {termos_busca} Brasil "consultoria" "B2B"',
         ]
 
         resultados = []
@@ -176,14 +180,27 @@ class Executor:
                 "canal": canal
             })
 
+        palavras_nicho = [
+            palavra.lower() for palavra in str(nicho or "").replace(",", " ").split()
+            if len(palavra.strip()) >= 4
+        ]
+        palavras_negocio = [
+            "consultor", "consultoria", "fundador", "co-fundador", "vendas",
+            "gestão", "gestao", "processos", "b2b", "comercial", "negócios",
+            "negocios", "serviços", "servicos"
+        ]
+
         for item in resultados:
             url = (item.get("url") or "").strip().lower()
-            if "instagram.com/" in url and "/explore" not in url and "/accounts/" not in url and "/about" not in url:
-                adicionar_candidato(item, "instagram")
-            elif "linkedin.com/in/" in url:
-                adicionar_candidato(item, "linkedin")
-            elif "wa.me/" in url or "api.whatsapp.com/send" in url:
-                adicionar_candidato(item, "whatsapp")
+            texto = " ".join([
+                str(item.get("titulo") or ""),
+                str(item.get("resumo") or "")
+            ]).lower()
+            if "linkedin.com/in/" in url:
+                sinais_nicho = sum(1 for palavra in palavras_nicho if palavra in texto)
+                sinais_negocio = sum(1 for palavra in palavras_negocio if palavra in texto)
+                if sinais_nicho >= 1 and sinais_negocio >= 1:
+                    adicionar_candidato(item, "linkedin")
 
         if not candidatos:
             return {
@@ -288,38 +305,52 @@ class Executor:
         if not url.startswith(("https://", "http://")):
             return {"status": "bloqueado", "acao": "validar_alvo", "motivo": "Nao ha URL publica especifica para validar o alvo."}
 
-        consulta = f'"{url}" contexto negocio servico perfil cliente necessidade {decisao.get("nicho", "")} {decisao.get("problema", "")}'
+        consulta = f'site:linkedin.com/in/ "{url}" {decisao.get("nicho", "")} {decisao.get("cliente_alvo", "")}'
         pesquisa = pesquisar(consulta, decisao.get("localizacao", "Brasil"))
         resultados = pesquisa.get("resultados", []) if isinstance(pesquisa, dict) else []
 
-        texto = " ".join([
+        texto_alvo = " ".join([
             str(alvo.get("titulo") or ""),
-            str(alvo.get("resumo") or ""),
-            " ".join(str(item.get("resumo") or "") for item in resultados if isinstance(item, dict))
+            str(alvo.get("resumo") or "")
         ]).strip()
+        texto_pesquisa = " ".join(
+            str(item.get("resumo") or "")
+            for item in resultados
+            if isinstance(item, dict)
+        ).strip()
+        texto = f"{texto_alvo} {texto_pesquisa}".strip().lower()
 
-        termos_problema = [
-            termo.lower()
-            for termo in str(decisao.get("problema") or "").replace(",", " ").split()
-            if len(termo.strip()) >= 5
+        palavras_nicho = [
+            termo.lower() for termo in str(decisao.get("nicho") or "").replace(",", " ").split()
+            if len(termo.strip()) >= 4
         ]
-        texto_lower = texto.lower()
-        sinais = [termo for termo in termos_problema if termo in texto_lower]
-        confianca = "alta" if len(sinais) >= 2 else "media" if len(sinais) == 1 else "baixa"
-        validado = bool(sinais) and bool(texto)
+        sinais_nicho = [termo for termo in palavras_nicho if termo in texto]
+
+        sinais_negocio = [
+            termo for termo in [
+                "consultor", "consultoria", "fundador", "co-fundador", "vendas",
+                "gestão", "gestao", "processos", "b2b", "comercial", "negócios",
+                "negocios", "serviços", "servicos"
+            ] if termo in texto
+        ]
+
+        sinais = list(dict.fromkeys(sinais_nicho + sinais_negocio))
+        confianca = "alta" if len(sinais_nicho) >= 2 and len(sinais_negocio) >= 2 else "media" if sinais_nicho and sinais_negocio else "baixa"
+        validado = bool(url) and bool(texto_alvo) and bool(sinais_nicho) and bool(sinais_negocio)
 
         evidencia = [
             {"tipo": "url_alvo", "url": url},
-            {"tipo": "sinais_problema", "termos": sinais},
+            {"tipo": "sinais_aderencia", "termos_nicho": sinais_nicho, "termos_negocio": sinais_negocio},
             {"tipo": "resultado_validacao", "resumos": [
                 str(item.get("resumo") or "")[:500]
                 for item in resultados[:5] if isinstance(item, dict)
             ]}
         ]
         motivo = (
-            "Foram encontrados sinais publicos compativeis com o problema pesquisado."
+            "O perfil público apresenta sinais de aderência ao nicho e à atividade comercial pesquisada. "
+            "Isso valida o alvo como potencial cliente, mas não prova que ele tenha o problema específico."
             if validado else
-            "A pesquisa publica nao trouxe evidencia suficiente para afirmar que o problema existe neste alvo."
+            "A pesquisa pública não trouxe evidência suficiente de que o perfil pertença ao nicho e à atividade pesquisados."
         )
 
         lead = resultado_anterior.get("lead_principal") or {}
@@ -340,7 +371,7 @@ class Executor:
                 confianca=confianca
             )
 
-        registrar_evento("validacao_alvo", f"Alvo {'validado' if validado else 'nao validado'}: {url}")
+        registrar_evento("validacao_alvo", f"Alvo {'validado' if validado else 'nao validado'} por aderencia de nicho: {url}")
         lead_principal = lead
         return {
             "status": "executado" if validado else "bloqueado",
