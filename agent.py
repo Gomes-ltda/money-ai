@@ -286,7 +286,7 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
     if leads_ativos and acao_inicial in {
         "pesquisar_alvo", "validar_alvo", "preparar_abordagem"
     }:
-        lead_prioritario = leads_ativos[-1]
+        lead_prioritario = leads_ativos[0]
         status_lead = lead_prioritario.get("status")
         if status_lead == "abordagem_preparada":
             acao_inicial = "aguardar"
