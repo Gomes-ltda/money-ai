@@ -58,7 +58,9 @@ def criar_tarefas(decisao):
         for acao_tarefa, descricao in CADEIA_PROCESSO[indice:]:
             adicionar(acao_tarefa, descricao)
     elif acao == "preparar_abordagem":
-        adicionar("preparar_abordagem", "Preparar uma abordagem comercial sem enviá-la.")
+        # A abordagem depende de alvo encontrado e validado no mesmo ciclo.
+        for acao_tarefa, descricao in CADEIA_PROCESSO[4:]:
+            adicionar(acao_tarefa, descricao)
     elif acao == "testar_estrategia":
         adicionar("testar_estrategia", "Registrar e estruturar o teste da estratégia.")
     else:
