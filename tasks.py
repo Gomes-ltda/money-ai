@@ -50,6 +50,13 @@ def criar_tarefas(decisao):
             adicionar(acao_tarefa, descricao)
     elif acao == "criar_conteudo":
         adicionar("criar_conteudo", "Produzir o material de teste.")
+    elif acao in {"pesquisar_alvo", "validar_alvo"}:
+        indice = next(
+            indice for indice, (acao_tarefa, _) in enumerate(CADEIA_PROCESSO)
+            if acao_tarefa == acao
+        )
+        for acao_tarefa, descricao in CADEIA_PROCESSO[indice:]:
+            adicionar(acao_tarefa, descricao)
     elif acao == "preparar_abordagem":
         adicionar("preparar_abordagem", "Preparar uma abordagem comercial sem enviá-la.")
     elif acao == "testar_estrategia":
