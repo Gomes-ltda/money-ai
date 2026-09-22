@@ -196,10 +196,12 @@ def registrar_estrategia(nome, descricao, status="em_teste"):
 
 
 def registrar_ciclo(objetivo, localizacao=None, pesquisa=None, analise=None, decisao=None,
-                    execucao=None, medicao=None, aprendizado=None, proxima_acao=None):
+                    execucao=None, medicao=None, aprendizado=None, proxima_acao=None,
+                    tipo="estrategico", pedido_id=None):
     memoria = carregar_memoria()
     ciclo = {
-        "data": agora(), "objetivo": objetivo, "localizacao": localizacao,
+        "data": agora(), "tipo": tipo, "pedido_id": pedido_id,
+        "objetivo": objetivo, "localizacao": localizacao,
         "pesquisa": pesquisa, "analise": analise, "decisao": decisao,
         "execucao": execucao, "medicao": medicao,
         "aprendizado": aprendizado,
@@ -210,8 +212,10 @@ def registrar_ciclo(objetivo, localizacao=None, pesquisa=None, analise=None, dec
     return ciclo
 
 
-def obter_ultimo_ciclo():
+def obter_ultimo_ciclo(tipo="estrategico"):
     ciclos = carregar_memoria().get("ciclos", [])
+    if tipo is not None:
+        ciclos = [c for c in ciclos if c.get("tipo", "estrategico") == tipo]
     if not ciclos:
         return None
     return ciclos[-1]
