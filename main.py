@@ -313,6 +313,23 @@ ADMIN_HTML = """
                 });
             } catch (erro) {}
         }
+        async function sincronizarPedidosAutomaticamente() {
+            const token = obterToken();
+            if (!token) return;
+            try {
+                const resposta = await fetch("/pedidos-clientes", {headers: {"Authorization": "Bearer " + token}});
+                const dados = await resposta.json();
+                if (!resposta.ok) return;
+                for (const pedido of (dados.pedidos || [])) {
+                    if (pedido.status === "aguardando_pagamento" && pedido.pagamento_id) {
+                        await fetch("/pedidos-clientes/"+encodeURIComponent(pedido.id)+"/sincronizar", {
+                            method:"POST", headers:{"Authorization":"Bearer "+token}
+                        });
+                    }
+                }
+            } catch(e) {}
+        }
+
         async function carregarPagamentos() {
             const resultado = document.getElementById("pagamentos");
             const token = obterToken();
@@ -415,31 +432,65 @@ ADMIN_HTML = """
                 if (!resposta.ok) return;
                 const pedidos = (dados.pedidos || []).slice().reverse();
                 if (!pedidos.length) { box.innerHTML = "<p>Nenhum pedido recebido ainda.</p>"; return; }
+
+                const etapas = ["recebido","em_analise","proposta_preparada","proposta_enviada","aguardando_pagamento","em_execucao","entregue"];
+                const labels = {
+                    "recebido":"Recebido",
+                    "em_analise":"Em análise",
+                    "proposta_preparada":"Proposta preparada",
+                    "proposta_enviada":"Proposta publicada",
+                    "aguardando_pagamento":"Aguardando pagamento",
+                    "em_execucao":"Em execução",
+                    "entregue":"Entregue",
+                    "cancelado":"Encerrado"
+                };
+
                 box.innerHTML = pedidos.slice(0,20).map(p => {
                     const prop = p.proposta || {};
                     const escopo = Array.isArray(prop.escopo) ? prop.escopo : [];
                     const perguntas = Array.isArray(prop.perguntas) ? prop.perguntas : [];
                     const valor = prop.valor != null ? "R$ " + Number(prop.valor).toLocaleString("pt-BR",{minimumFractionDigits:2}) : "A definir";
+                    const status = p.status || "recebido";
                     const ciclo = p.ciclo || {};
-                    const status = statusPedidoLabel[p.status] || p.status || "Recebido";
-                    const podeProcessar = ["recebido","em_analise"].includes(p.status);
-                    const podePublicar = p.status === "proposta_preparada" && prop.texto;
+                    const propPublicada = ["proposta_enviada","aguardando_pagamento","em_execucao","entregue"].includes(status);
+                    const pagamento = p.pagamento_id ? "Pagamento vinculado" : "Sem pagamento";
+                    let progress = "<div style='display:flex;gap:4px;flex-wrap:wrap;margin:12px 0'>" +
+                        etapas.map(et => "<span style='padding:5px 8px;border-radius:999px;border:1px solid #ddd;font-size:11px;background:" +
+                            (et===status ? "#111;color:#fff" : (etapas.indexOf(et)<etapas.indexOf(status) ? "#eee" : "#fff")) + "'>" + labels[et] + "</span>").join("") +
+                        "</div>";
+
+                    let botoes = "";
+                    if (["recebido","em_analise"].includes(status)) {
+                        botoes += "<button onclick='executarCicloPedido(\\\""+p.id+"\\\")'>Executar ciclo da EVOLIA</button>";
+                    }
+                    if (status === "proposta_preparada" && prop.texto) {
+                        botoes += " <button onclick='publicarPropostaPedido(\\\""+p.id+"\\\")'>Autorizar e publicar proposta</button>";
+                    }
+                    if (status === "aguardando_pagamento") {
+                        botoes += " <button onclick='sincronizarPedido(\\\""+p.id+"\\\")'>Sincronizar pagamento</button>";
+                    }
+                    if (status === "em_execucao") {
+                        botoes += " <button onclick='registrarEntregaPedido(\\\""+p.id+"\\\")'>Registrar entrega</button>";
+                    }
+
                     return "<div style='border:1px solid #ccc;padding:18px;margin:12px 0;border-radius:10px'>" +
-                    "<div style='font-size:18px'><b>"+escPedido(p.nome)+"</b> · "+escPedido(status)+(p.modo_teste?" · TESTE":"")+"</div>" +
+                    "<div style='font-size:18px'><b>"+escPedido(p.nome)+"</b> · "+escPedido(labels[status] || status)+(p.modo_teste?" · TESTE":"")+"</div>" +
+                    progress +
                     "<p><b>Serviço:</b> "+escPedido(p.servico)+"<br><b>Contato:</b> "+escPedido(p.email || p.whatsapp || p.instagram || "-")+
                     "<br><b>Pedido:</b> "+escPedido(p.descricao)+"</p>" +
-                    (ciclo.data ? "<p class='info'><b>Último ciclo:</b> "+escPedido(ciclo.data)+"</p>" : "") +
+                    "<p class='info'><b>Etapa atual:</b> "+escPedido(ciclo.etapa_atual || status)+" · <b>"+escPedido(pagamento)+"</b></p>" +
                     (prop.texto ? "<div style='background:#f6f6f6;border-radius:10px;padding:14px;margin-top:12px'>" +
                         "<b>Proposta gerada pela EVOLIA</b><p style='white-space:pre-wrap'>"+escPedido(prop.texto)+"</p>" +
                         "<p><b>Valor sugerido:</b> "+escPedido(valor)+"<br><b>Prazo:</b> "+escPedido(prop.prazo || "A definir")+"</p>" +
                         (escopo.length ? "<p><b>Escopo:</b><br>• "+escopo.map(escPedido).join("<br>• ")+"</p>" : "") +
                         (perguntas.length ? "<p><b>Pontos que ainda precisam de confirmação:</b><br>• "+perguntas.map(escPedido).join("<br>• ")+"</p>" : "") +
                         "</div>" : "<p style='color:#666'>A EVOLIA ainda não preparou uma proposta para este pedido.</p>") +
-                    "<div style='margin-top:14px'>" +
-                    (podeProcessar ? "<button onclick='executarCicloPedido(&quot;"+p.id+"&quot;)'>Executar ciclo da EVOLIA</button>" : "") +
-                    (podePublicar ? " <button onclick='publicarPropostaPedido(&quot;"+p.id+"&quot;)'>Autorizar e publicar proposta</button>" : "") +
+                    "<div style='margin-top:14px'>" + botoes +
                     " <a href='/pedido/"+encodeURIComponent(p.token_publico)+"' target='_blank'>Abrir página do cliente</a></div>" +
-                    (p.status === "proposta_preparada" ? "<p class='info'>A proposta foi preparada pelo ciclo. Nenhum contato externo foi feito; a publicação exige sua autorização.</p>" : "") +
+                    (status === "proposta_preparada" ? "<p class='info'>A proposta foi preparada. O próximo avanço exige sua autorização para publicação.</p>" : "") +
+                    (status === "proposta_enviada" ? "<p class='info'>Aguardando o cliente aceitar a proposta.</p>" : "") +
+                    (status === "aguardando_pagamento" ? "<p class='info'>O cliente aceitou. A cobrança pode ser gerada na página privada.</p>" : "") +
+                    (status === "em_execucao" ? "<p class='info'>Pagamento confirmado. A execução do serviço é a etapa operacional atual.</p>" : "") +
                     "</div>";
                 }).join("");
             } catch(e) {}
@@ -461,12 +512,40 @@ ADMIN_HTML = """
             if(!resposta.ok){alert(dados.erro||"Não foi possível publicar a proposta.");return;}
             carregarPedidosClientes();
         }
+        async function sincronizarPedido(id) {
+            const token = obterToken();
+            if (!token) return;
+            const resposta = await fetch("/pedidos-clientes/"+encodeURIComponent(id)+"/sincronizar", {
+                method:"POST", headers:{"Authorization":"Bearer "+token}
+            });
+            const dados = await resposta.json();
+            if (!resposta.ok) { alert(dados.erro || "Não foi possível sincronizar."); return; }
+            carregarPedidosClientes();
+        }
+
+        async function registrarEntregaPedido(id) {
+            const token = obterToken();
+            if (!token) return;
+            const texto = prompt("Descreva a entrega disponibilizada ao cliente:");
+            if (!texto || !texto.trim()) return;
+            const url = prompt("URL da entrega (opcional):") || "";
+            const resposta = await fetch("/pedidos-clientes/"+encodeURIComponent(id)+"/entrega", {
+                method:"POST",
+                headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+                body:JSON.stringify({texto:texto,url:url})
+            });
+            const dados = await resposta.json();
+            if (!resposta.ok) { alert(dados.erro || "Não foi possível registrar a entrega."); return; }
+            carregarPedidosClientes();
+        }
+
         let intervaloAcoes = null;
         function iniciarAtualizacaoAutomatica() {
             if (intervaloAcoes) clearInterval(intervaloAcoes);
             if (obterToken()) {
                 carregarAcoes();
                 carregarPedidosClientes();
+                sincronizarPedidosAutomaticamente();
                 carregarAcoesEmAndamento();
                 carregarHistorico();
                 sincronizarPagamentosAutomaticamente();
@@ -475,6 +554,7 @@ ADMIN_HTML = """
                     if (obterToken()) {
                         carregarAcoes();
                         carregarPedidosClientes();
+                        sincronizarPedidosAutomaticamente();
                         carregarAcoesEmAndamento();
                         carregarHistorico();
                         sincronizarPagamentosAutomaticamente();
