@@ -19,7 +19,7 @@ from memory import (
 )
 
 ACOES_PERMITIDAS = {
-    "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "criar_oferta",
+    "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "analisar_pedido_cliente", "criar_oferta",
     "criar_proposta", "criar_conteudo", "executar_pedido", "validar_resultado", "pesquisar_alvo", "validar_alvo", "preparar_abordagem", "testar_estrategia", "acompanhar_lead", "processar_resposta", "preparar_followup", "medir_resultado"
 }
 
