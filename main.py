@@ -153,6 +153,28 @@ ADMIN_HTML = """
             return document.getElementById("tokenAutorizacao").value.trim() || sessionStorage.getItem("evolia_token") || "";
         }
 
+        function mostrarResultadoCiclo(dados) {
+            const ciclo = dados.ciclo_memoria || {};
+            const decisao = dados.decisao_ia?.decisao || dados.decisao || {};
+            const medicao = dados.medicao || {};
+            const aprendizado = ciclo.aprendizado || dados.decisao_ia?.aprendizado_esperado || "-";
+            const proxima = ciclo.proxima_acao || decisao.proxima_acao_ciclo || dados.decisao_ia?.proximo_passo || "-";
+            const estrategia = decisao.estrategia || "-";
+            const acao = decisao.acao_executor || decisao.acao || "-";
+            const resultado = Number(medicao.resultado || 0).toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
+            document.getElementById("resultado").innerHTML =
+                "<div style='border:1px solid #ccc;border-radius:12px;padding:16px'>" +
+                "<b>Estratégia:</b> " + estrategia + "<br>" +
+                "<b>Ação executada:</b> " + acao + "<br>" +
+                "<b>Resultado financeiro:</b> " + resultado + "<br><br>" +
+                "<b>O que a EVOLIA aprendeu:</b><br>" + aprendizado + "<br><br>" +
+                "<b>Próximo passo:</b><br>" + proxima +
+                "</div>" +
+                "<details style='margin-top:14px'><summary>Ver dados completos do ciclo</summary><pre style='white-space:pre-wrap;margin-top:10px'>" +
+                JSON.stringify(dados, null, 2).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;") +
+                "</pre></details>";
+        }
+
         async function prospectarClientes() {
             const resultado = document.getElementById("resultado");
             const botao = document.getElementById("botaoProspeccao");
@@ -180,7 +202,7 @@ ADMIN_HTML = """
                     statusGeral.textContent = "Erro";
                     return;
                 }
-                resultado.textContent = JSON.stringify(dados, null, 2);
+                mostrarResultadoCiclo(dados);
                 statusGeral.textContent = "Prospecção concluída";
                 carregarAcoes();
             } catch (erro) {
@@ -224,7 +246,7 @@ ADMIN_HTML = """
                     return;
                 }
 
-                resultado.textContent = JSON.stringify(dados, null, 2);
+                mostrarResultadoCiclo(dados);
                 statusGeral.textContent = "Ciclo concluído";
             } catch (erro) {
                 resultado.textContent = "Erro de conexão com a Evolia.";
