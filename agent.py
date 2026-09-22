@@ -115,8 +115,15 @@ def executar_ciclo_pedido(pedido_id, localizacao="Brasil"):
         pedido_id,
         status="proposta_preparada",
         proposta=proposta,
-        observacao="Ciclo da EVOLIA concluído: proposta preparada e aguardando autorização para publicação ao cliente."
+        observacao="Ciclo da EVOLIA concluído: proposta preparada. A publicação para o cliente será automática."
     )
+
+    # Pedidos recebidos são um fluxo próprio da EVOLIA. A publicação da
+    # proposta não deve depender de autorização manual a cada atendimento.
+    from pedido_fluxo import publicar_proposta
+    publicacao = publicar_proposta(pedido_id)
+    if publicacao.get("ok"):
+        atualizado = publicacao.get("pedido") or obter_pedido_cliente(pedido_id)
 
     decisao = {
         "acao": "analisar_pedido_cliente",
@@ -125,7 +132,7 @@ def executar_ciclo_pedido(pedido_id, localizacao="Brasil"):
         "cliente_alvo": pedido.get("nome"),
         "problema": pedido.get("descricao"),
         "oferta": pedido.get("servico"),
-        "proxima_acao_ciclo": "Revisar e, se estiver adequada, autorizar a publicação da proposta ao cliente."
+        "proxima_acao_ciclo": "Aguardar o cliente consultar a proposta, responder eventuais perguntas e decidir sobre o aceite."
     }
     execucao = {
         "status": "executado",
@@ -147,12 +154,12 @@ def executar_ciclo_pedido(pedido_id, localizacao="Brasil"):
         execucao=execucao,
         medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "proposta_preparada"},
         aprendizado="O pedido foi transformado em uma proposta estruturada sem executar comunicação externa.",
-        proxima_acao="Revisar e autorizar a publicação da proposta ao cliente.",
+        proxima_acao="Aguardar o cliente consultar a proposta, responder eventuais perguntas e decidir sobre o aceite.",
         tipo="pedido_cliente",
         pedido_id=pedido_id
     )
     return {
-        "status": "proposta_preparada",
+        "status": "proposta_enviada" if publicacao.get("ok") else "proposta_preparada",
         "pedido_id": pedido_id,
         "pedido": atualizado,
         "analise": analise,
