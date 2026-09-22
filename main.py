@@ -102,7 +102,7 @@ ADMIN_HTML = """
     <div id="historicoAcoes"></div>
     <hr>
     <h2>Pedidos de clientes</h2>
-    <p>Solicitações recebidas pelo site principal. Analise, envie proposta e publique a entrega por aqui.</p>
+    <p>Cada solicitação entra no ciclo da EVOLIA. O sistema pesquisa, analisa e prepara a proposta; comunicação com o cliente continua dependendo da sua autorização.</p>
     <div id="pedidosClientes"></div>
 <hr>
     <h2>Pagamentos</h2>
