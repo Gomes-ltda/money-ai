@@ -7,7 +7,7 @@ from memory import registrar_evento, registrar_teste, registrar_acao_externa, ob
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "executar_pedido", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "processar_resposta", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
+    "criar_proposta", "criar_conteudo", "executar_pedido", "validar_resultado", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "processar_resposta", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
 }
 
 def agora():
@@ -46,6 +46,8 @@ class Executor:
                 resultado = self.criar_conteudo(decisao)
             elif acao == "executar_pedido":
                 resultado = self.executar_pedido(decisao)
+            elif acao == "validar_resultado":
+                resultado = self.validar_resultado(decisao)
             elif acao == "pesquisar_alvo":
                 resultado = self.pesquisar_alvo(decisao)
             elif acao == "validar_alvo":
@@ -326,6 +328,74 @@ class Executor:
                 "envio_externo": False
             },
             "pedido": atualizado
+        }
+
+    def validar_resultado(self, decisao):
+        """Valida o resultado produzido e disponibiliza a entrega no pedido."""
+        from memory import obter_pedido_cliente
+        from pedido_fluxo import registrar_entrega
+
+        pedido_id = str(decisao.get("pedido_id") or "").strip()
+        pedido = obter_pedido_cliente(pedido_id)
+        if not pedido:
+            return {"status": "bloqueado", "acao": "validar_resultado", "motivo": "Pedido não encontrado."}
+
+        if pedido.get("status") != "em_execucao":
+            return {
+                "status": "bloqueado",
+                "acao": "validar_resultado",
+                "motivo": "O pedido precisa estar em execução para validação.",
+                "pedido_status": pedido.get("status")
+            }
+
+        execucao = pedido.get("execucao") or {}
+        resultado = execucao.get("resultado") or {}
+        validacao = resultado.get("validacao") or {}
+
+        checks = {
+            "resultado_presente": bool(resultado),
+            "servico_identificado": bool(str(resultado.get("servico") or "").strip()),
+            "escopo_presente": bool(resultado.get("escopo")),
+            "conteudo_presente": bool(str(resultado.get("conteudo") or "").strip()),
+            "pedido_pago": validacao.get("pedido_pago") is True,
+        }
+        valido = all(checks.values())
+
+        if not valido:
+            return {
+                "status": "bloqueado",
+                "acao": "validar_resultado",
+                "motivo": "O resultado não passou na validação interna.",
+                "checks": checks
+            }
+
+        entrega = registrar_entrega(
+            pedido_id,
+            texto=str(resultado.get("conteudo")),
+            url=None
+        )
+        if not entrega.get("ok"):
+            return {
+                "status": "bloqueado",
+                "acao": "validar_resultado",
+                "motivo": entrega.get("erro") or "Não foi possível registrar a entrega.",
+                "checks": checks
+            }
+
+        registrar_evento("pedido_validado_entregue", "Resultado validado e disponibilizado no pedido " + pedido_id + ".")
+        return {
+            "status": "executado",
+            "acao": "validar_resultado",
+            "resultado": {
+                "receita": 0,
+                "custo": 0,
+                "pedido_id": pedido_id,
+                "validado": True,
+                "checks": checks,
+                "entregue": True,
+                "entrega": entrega.get("pedido", {}).get("entrega"),
+                "envio_externo": False
+            }
         }
 
     def criar_oferta(self, decisao):
