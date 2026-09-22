@@ -323,6 +323,13 @@ class Executor:
         )
 
         lead = resultado_anterior.get("lead_principal") or {}
+        if not lead.get("id"):
+            for lead_memoria in reversed(obter_leads(limite=100)):
+                if (lead_memoria.get("url") or "").strip() == url and (
+                    not decisao.get("estrategia") or lead_memoria.get("estrategia") == decisao.get("estrategia")
+                ):
+                    lead = lead_memoria
+                    break
         if lead.get("id"):
             from memory import atualizar_lead
             atualizar_lead(
