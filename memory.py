@@ -24,6 +24,7 @@ def memoria_padrao():
         "acoes_externas": [],
         "pagamentos": [],
         "pedidos_clientes": [],
+        "reclamacoes": [],
         "leads": [],
         "financeiro": {
             "receita": 0,
@@ -56,6 +57,9 @@ def garantir_estrutura(memoria):
 
     if not isinstance(memoria.get("pedidos_clientes"), list):
         memoria["pedidos_clientes"] = []
+
+    if not isinstance(memoria.get("reclamacoes"), list):
+        memoria["reclamacoes"] = []
 
     if not isinstance(memoria.get("leads"), list):
         memoria["leads"] = []
@@ -525,6 +529,55 @@ def registrar_pedido_cliente(nome, email=None, whatsapp=None, instagram=None, se
     memoria["pedidos_clientes"].append(pedido)
     salvar_memoria(memoria)
     return pedido
+
+
+
+def registrar_reclamacao(pedido_id, token_publico, nome, contato, assunto, descricao):
+    """Registra uma reclamação vinculada a um pedido, sem expor dados do cliente."""
+    import uuid
+    memoria = carregar_memoria()
+    reclamacao = {
+        "id": uuid.uuid4().hex,
+        "criada_em": agora(),
+        "atualizada_em": agora(),
+        "pedido_id": pedido_id,
+        "token_publico": token_publico,
+        "nome": str(nome or "").strip(),
+        "contato": str(contato or "").strip(),
+        "assunto": str(assunto or "Outro").strip(),
+        "descricao": str(descricao or "").strip(),
+        "status": "aberta",
+        "resposta": None,
+        "resolucao": None
+    }
+    memoria.setdefault("reclamacoes", []).append(reclamacao)
+    salvar_memoria(memoria)
+    return reclamacao
+
+
+def obter_reclamacoes(limite=100, pedido_id=None, status=None):
+    reclamacoes = carregar_memoria().get("reclamacoes", [])
+    if pedido_id:
+        reclamacoes = [x for x in reclamacoes if x.get("pedido_id") == pedido_id]
+    if status:
+        reclamacoes = [x for x in reclamacoes if x.get("status") == status]
+    return reclamacoes[-limite:]
+
+
+def atualizar_reclamacao(reclamacao_id, status=None, resposta=None, resolucao=None):
+    memoria = carregar_memoria()
+    for reclamacao in reversed(memoria.get("reclamacoes", [])):
+        if reclamacao.get("id") == reclamacao_id:
+            if status is not None:
+                reclamacao["status"] = str(status).strip()
+            if resposta is not None:
+                reclamacao["resposta"] = str(resposta).strip()
+            if resolucao is not None:
+                reclamacao["resolucao"] = str(resolucao).strip()
+            reclamacao["atualizada_em"] = agora()
+            salvar_memoria(memoria)
+            return reclamacao
+    return None
 
 
 def obter_pedidos_clientes(limite=100):
