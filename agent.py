@@ -33,6 +33,8 @@ def _montar_decisao(detalhes, acao, objetivo, localizacao, motivo):
         "oferta": detalhes.get("oferta"),
         "canal": detalhes.get("canal"),
         "url_alvo": detalhes.get("url_alvo"),
+        "alvo_validado": detalhes.get("alvo_validado", False),
+        "evidencia_alvo_memoria": detalhes.get("evidencia_alvo_memoria", []),
         "preco_teste": detalhes.get("preco_teste"),
         "custo_teste": detalhes.get("custo_teste"),
         "acao_imediata": detalhes.get("acao_imediata"),
