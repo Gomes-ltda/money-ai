@@ -6,7 +6,7 @@ from pesquisa import pesquisar
 from memory import registrar_evento, registrar_teste, registrar_acao_externa, obter_acoes_externas, registrar_lead, obter_leads, atualizar_lead
 
 ACOES_INTERNAS = {
-    "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "criar_oferta",
+    "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "criar_oferta",
     "criar_proposta", "criar_conteudo", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "processar_resposta", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
 }
 
@@ -36,6 +36,8 @@ class Executor:
                 resultado = self.executar_analise(decisao)
             elif acao == "analisar_reclamacao":
                 resultado = self.analisar_reclamacao(decisao)
+            elif acao == "resolver_reclamacao":
+                resultado = self.resolver_reclamacao(decisao)
             elif acao == "criar_oferta":
                 resultado = self.criar_oferta(decisao)
             elif acao == "criar_proposta":
@@ -134,6 +136,106 @@ class Executor:
                 "providencia": providencia,
                 "pedido_id": reclamacao.get("pedido_id"),
                 "pedido_status": (pedido or {}).get("status")
+            }
+        }
+
+    def resolver_reclamacao(self, decisao):
+        """Executa a providência possível para uma reclamação já analisada."""
+        from memory import obter_reclamacoes, atualizar_reclamacao, obter_pedido_cliente, obter_pagamento_por_id
+        from pedido_fluxo import sincronizar_pedido_pagamento
+
+        reclamacao_id = str(decisao.get("reclamacao_id") or "").strip()
+        reclamacao = next((r for r in obter_reclamacoes(limite=200) if r.get("id") == reclamacao_id), None)
+        if not reclamacao:
+            return {"status": "bloqueado", "acao": "resolver_reclamacao", "motivo": "Reclamação não encontrada."}
+        if reclamacao.get("status") in {"resolvida", "encerrada"}:
+            return {"status": "bloqueado", "acao": "resolver_reclamacao", "motivo": "A reclamação já foi encerrada."}
+
+        pedido_id = reclamacao.get("pedido_id")
+        pedido = obter_pedido_cliente(pedido_id) if pedido_id else None
+        if not pedido:
+            atualizar_reclamacao(
+                reclamacao_id,
+                status="em_analise",
+                resposta="Não foi possível localizar o pedido vinculado. O caso permanece em análise para correção do vínculo.",
+            )
+            return {
+                "status": "bloqueado", "acao": "resolver_reclamacao",
+                "motivo": "Pedido vinculado não encontrado.",
+                "resultado": {"receita": 0, "custo": 0, "reclamacao_id": reclamacao_id}
+            }
+
+        texto = (str(reclamacao.get("assunto") or "") + " " + str(reclamacao.get("descricao") or "")).lower()
+        categoria = "qualidade"
+        resolucao = None
+        resposta = None
+
+        if any(x in texto for x in ("pagamento", "cobrança", "cobranca", "pix", "valor")):
+            categoria = "financeiro"
+            pagamento = obter_pagamento_por_id(pedido.get("pagamento_id")) if pedido.get("pagamento_id") else None
+            if pagamento and pagamento.get("status") == "pago":
+                resolucao = "Pagamento vinculado verificado como pago; não foi feita movimentação financeira automática."
+                resposta = "Verificamos o pagamento vinculado ao pedido. Ele consta como confirmado. Se a reclamação for sobre o valor cobrado, o caso precisa de conferência específica antes de qualquer ajuste financeiro."
+            elif pagamento:
+                resolucao = "Pagamento vinculado localizado, mas ainda não consta como pago."
+                resposta = "Verificamos a cobrança vinculada ao pedido. O pagamento ainda não consta como confirmado."
+            else:
+                resolucao = "Não há pagamento vinculado localizado para este pedido."
+                resposta = "Não localizamos um pagamento confirmado vinculado a este pedido. A cobrança precisa ser conferida antes de qualquer conclusão financeira."
+
+        elif any(x in texto for x in ("entrega", "arquivo", "link", "não recebi", "nao recebi")):
+            categoria = "entrega"
+            entrega = pedido.get("entrega") or {}
+            if pedido.get("status") == "entregue" and (entrega.get("texto") or entrega.get("url")):
+                resolucao = "Entrega já registrada no pedido; disponibilização adicional depende de canal de envio autorizado."
+                resposta = "A entrega consta como registrada no pedido. O conteúdo permanece associado ao pedido para disponibilização novamente; nenhum envio externo foi realizado automaticamente."
+            else:
+                sincronizar_pedido_pagamento(pedido_id)
+                pedido_atual = obter_pedido_cliente(pedido_id) or pedido
+                resolucao = "Pedido verificado; a entrega ainda não consta como concluída."
+                resposta = "Verificamos o pedido e a entrega ainda não consta como concluída. O caso permanece em análise até que o resultado seja produzido e disponibilizado."
+                pedido = pedido_atual
+
+        elif any(x in texto for x in ("prazo", "atraso", "demora")):
+            categoria = "prazo"
+            resolucao = "Status do pedido verificado; nenhuma previsão foi inventada."
+            resposta = "Verificamos o andamento do pedido. O prazo informado ao cliente deve ser baseado no estado real da execução, sem estimativa automática não confirmada."
+
+        else:
+            categoria = "qualidade"
+            resolucao = "Escopo e estado do pedido verificados; não foi feita alteração de entrega sem evidência de erro."
+            resposta = "Verificamos o pedido e o escopo registrado. Qualquer correção de qualidade deve ser baseada no resultado efetivamente entregue, sem substituir o serviço por uma resposta genérica."
+
+        pode_encerrar = categoria == "financeiro" and bool(pedido.get("pagamento_id")) and bool(obter_pagamento_por_id(pedido.get("pagamento_id")))
+        if categoria == "financeiro" and "confirmado" in (resposta or "").lower():
+            pode_encerrar = True
+        if categoria in {"entrega", "prazo", "qualidade"}:
+            pode_encerrar = False
+
+        novo_status = "resolvida" if pode_encerrar else "em_analise"
+        atualizar_reclamacao(
+            reclamacao_id,
+            status=novo_status,
+            resposta=resposta,
+            resolucao="Categoria: " + categoria + ". " + (resolucao or "")
+        )
+        registrar_evento(
+            "reclamacao_resolvida" if novo_status == "resolvida" else "reclamacao_tratada",
+            "Reclamação " + reclamacao_id + " tratada na categoria " + categoria + "."
+        )
+        return {
+            "status": "executado",
+            "acao": "resolver_reclamacao",
+            "resultado": {
+                "receita": 0,
+                "custo": 0,
+                "reclamacao_id": reclamacao_id,
+                "pedido_id": pedido_id,
+                "categoria": categoria,
+                "status_reclamacao": novo_status,
+                "resolucao": resolucao,
+                "resposta_preparada": resposta,
+                "envio_externo": False
             }
         }
 
