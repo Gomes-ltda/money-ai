@@ -265,3 +265,78 @@ def ciclo_pedido_resumo(pedido_id):
         "pagamento": pagamento,
         "entrega": pedido.get("entrega"),
     }
+
+
+def criar_pedido_de_venda_lead(lead, acao, feedback):
+    """Converte uma venda confirmada no funil comercial em pedido operacional."""
+    nome = lead.get("nome") or acao.get("alvo") or "Cliente"
+    valor = float(feedback.get("receita") or 0)
+    if valor <= 0:
+        return {"ok": False, "erro": "A venda confirmada não possui valor de receita informado."}
+
+    email = str(
+        lead.get("email")
+        or (acao.get("contexto") or {}).get("email")
+        or ""
+    ).strip().lower()
+
+    # Não duplica pedidos para a mesma ação comercial.
+    pedido_existente = next(
+        (
+            p for p in __import__("memory").carregar_memoria().get("pedidos_clientes", [])
+            if (p.get("origem_lead_acao_id") == acao.get("id"))
+        ),
+        None,
+    )
+    if pedido_existente:
+        return {"ok": True, "pedido": pedido_existente, "ja_existente": True}
+
+    agora_data = agora()
+    pedido = {
+        "id": __import__("uuid").uuid4().hex,
+        "token_publico": __import__("secrets").token_urlsafe(24),
+        "criado_em": agora_data,
+        "atualizado_em": agora_data,
+        "nome": nome,
+        "email": email,
+        "whatsapp": str(lead.get("whatsapp") or (acao.get("contexto") or {}).get("whatsapp") or "").strip(),
+        "instagram": str(lead.get("instagram") or "").strip(),
+        "servico": lead.get("oferta") or (acao.get("contexto") or {}).get("oferta") or "Serviço contratado",
+        "descricao": lead.get("problema") or "Venda confirmada no funil comercial da EVOLIA.",
+        "modo_teste": False,
+        "status": "aguardando_pagamento",
+        "proposta": {
+            "texto": "Venda confirmada no funil comercial.",
+            "valor": valor,
+            "prazo": None,
+            "escopo": [lead.get("oferta") or "Serviço contratado"],
+            "nao_incluido": [],
+            "perguntas": [],
+            "justificativa_preco": "Valor informado no feedback da venda.",
+            "riscos": [],
+            "confianca": "alta",
+            "origem": "lead_comercial",
+        },
+        "aceite": {
+            "aceito": True,
+            "data": agora_data,
+            "valor": valor,
+            "origem": "lead_comercial",
+        },
+        "origem_lead_id": lead.get("id"),
+        "origem_lead_acao_id": acao.get("id"),
+        "historico": [
+            {"data": agora_data, "status": "recebido", "observacao": "Venda confirmada no funil comercial."},
+            {"data": agora_data, "status": "aguardando_pagamento", "observacao": "Pedido criado a partir de venda confirmada; pagamento é o próximo passo."},
+        ],
+        "ciclo": {
+            "etapa_atual": "aguardando_pagamento",
+            "status": "aguardando_pagamento",
+            "ultima_atualizacao": agora_data,
+            "historico": [],
+        },
+    }
+    memoria = __import__("memory").carregar_memoria()
+    memoria.setdefault("pedidos_clientes", []).append(pedido)
+    __import__("memory").salvar_memoria(memoria)
+    return {"ok": True, "pedido": pedido, "ja_existente": False}
