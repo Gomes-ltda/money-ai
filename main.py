@@ -633,7 +633,7 @@ footer{background:#111;color:#aaa;padding:30px 0}
 </style>
 </head>
 <body>
-<header><div class="wrap"><div class="logo">Evolia AI</div><nav class="nav"><a href="#servicos">Serviços</a><a href="#como-funciona">Como funciona</a><a href="#solicitar">Solicitar</a></nav></div></header>
+<header><div class="wrap"><div class="logo">Evolia AI</div><nav class="nav"><a href="#servicos">Serviços</a><a href="#como-funciona">Como funciona</a><a href="#solicitar">Solicitar</a><a href="#meus-pedidos">Meus pedidos</a></nav></div></header>
 <main>
 <section class="hero"><div class="wrap">
 <div class="eyebrow">Serviços digitais sob medida</div>
@@ -656,7 +656,7 @@ footer{background:#111;color:#aaa;padding:30px 0}
 <div class="step"><strong>2. Avaliamos</strong><p>Organizamos o pedido e definimos escopo, prazo e preço.</p></div>
 <div class="step"><strong>3. Entregamos</strong><p>Após a confirmação, o resultado fica disponível para você pelo próprio site.</p></div>
 </div></div></section>
-<section id="solicitar"><div class="wrap">
+<section id="meus-pedidos"><div class="wrap"><div class="form-card"><h2>Meus pedidos</h2><p class="section-intro">Pedidos solicitados neste dispositivo ficam salvos aqui para acompanhamento.</p><div id="listaMeusPedidos"><p class="small">Nenhum pedido salvo neste dispositivo.</p></div></div></div></section><section id="solicitar"><div class="wrap">
 <div class="form-card">
 <h2>Solicitar orçamento</h2>
 <p class="section-intro">Preencha o formulário. Ao enviar, você receberá um link privado para acompanhar o pedido.</p>
@@ -680,6 +680,7 @@ footer{background:#111;color:#aaa;padding:30px 0}
 </main>
 <footer><div class="wrap">Evolia AI · Serviços digitais</div></footer>
 <script>
+function carregarMeusPedidos(){const b=document.getElementById("listaMeusPedidos");if(!b)return;let p=[];try{p=JSON.parse(localStorage.getItem("evolia_pedidos")||"[]")}catch(e){};b.innerHTML=p.length?p.map(x=>"<div style=\"border:1px solid #ddd;border-radius:12px;padding:14px;margin:10px 0\"><strong>Pedido "+x.id+"</strong><p class=\"small\">Solicitado em "+new Date(x.criado_em).toLocaleString("pt-BR")+"</p><a class=\"btn\" href=\""+x.url+"\">Acompanhar pedido</a></div>").join(""):"<p class=\"small\">Nenhum pedido salvo neste dispositivo.</p>"}
 async function enviarPedido(event){
  event.preventDefault();
  const box=document.getElementById("pedidoResultado");
@@ -694,10 +695,11 @@ async function enviarPedido(event){
   })});
   const d=await r.json();
   if(!r.ok){box.textContent=d.erro||"Não foi possível enviar o pedido.";return;}
-  box.innerHTML="<strong>Pedido recebido.</strong><p>Guarde este link para acompanhar o atendimento:</p><p><a href='"+d.url_publica+"'>"+d.url_publica+"</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
+  const pedidos=JSON.parse(localStorage.getItem("evolia_pedidos")||"[]"); pedidos.unshift({id:d.pedido_id,url:d.url_publica,criado_em:new Date().toISOString()}); localStorage.setItem("evolia_pedidos",JSON.stringify(pedidos.slice(0,20))); carregarMeusPedidos(); box.innerHTML="<strong>Pedido recebido.</strong><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
   document.getElementById("pedidoForm").reset();
  }catch(e){box.textContent="Erro de conexão. Tente novamente.";}
 }
+carregarMeusPedidos();
 </script>
 </body>
 </html>
