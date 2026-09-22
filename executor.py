@@ -6,7 +6,7 @@ from pesquisa import pesquisar
 from memory import registrar_evento, registrar_teste, registrar_acao_externa, obter_acoes_externas, registrar_lead, obter_leads, atualizar_lead
 
 ACOES_INTERNAS = {
-    "aguardar", "pesquisar", "analisar", "criar_oferta",
+    "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "criar_oferta",
     "criar_proposta", "criar_conteudo", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "processar_resposta", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
 }
 
@@ -34,6 +34,8 @@ class Executor:
                 resultado = self.executar_pesquisa(decisao)
             elif acao == "analisar":
                 resultado = self.executar_analise(decisao)
+            elif acao == "analisar_reclamacao":
+                resultado = self.analisar_reclamacao(decisao)
             elif acao == "criar_oferta":
                 resultado = self.criar_oferta(decisao)
             elif acao == "criar_proposta":
@@ -94,6 +96,46 @@ class Executor:
         }
         registrar_evento("analise", f"Análise estruturada para a estratégia: {decisao.get('estrategia')}")
         return {"status": "executado", "acao": "analisar", "resultado": {"receita": 0, "custo": 0, "analise": analise}}
+
+    def analisar_reclamacao(self, decisao):
+        from memory import obter_reclamacoes, atualizar_reclamacao, obter_pedido_cliente
+
+        reclamacao_id = str(decisao.get("reclamacao_id") or "").strip()
+        reclamacao = next((r for r in obter_reclamacoes(limite=200) if r.get("id") == reclamacao_id), None)
+        if not reclamacao:
+            return {"status": "bloqueado", "acao": "analisar_reclamacao", "motivo": "Reclamação não encontrada."}
+        if reclamacao.get("status") in {"resolvida", "encerrada"}:
+            return {"status": "bloqueado", "acao": "analisar_reclamacao", "motivo": "A reclamação já foi encerrada."}
+
+        texto = (str(reclamacao.get("assunto") or "") + " " + str(reclamacao.get("descricao") or "")).lower()
+        if any(x in texto for x in ("pagamento", "cobrança", "pix", "valor")):
+            categoria, providencia = "financeiro", "verificar cobrança e pagamento vinculados antes de responder."
+        elif any(x in texto for x in ("entrega", "arquivo", "link", "não recebi", "nao recebi")):
+            categoria, providencia = "entrega", "verificar o registro da entrega e disponibilizar novamente o resultado, se necessário."
+        elif any(x in texto for x in ("prazo", "atraso", "demora")):
+            categoria, providencia = "prazo", "verificar o andamento do pedido e registrar uma previsão objetiva."
+        else:
+            categoria, providencia = "qualidade", "verificar o escopo contratado e o resultado entregue antes de definir a correção."
+
+        atualizar_reclamacao(
+            reclamacao_id,
+            status="em_analise",
+            resolucao="Categoria: " + categoria + ". Providência recomendada: " + providencia
+        )
+        pedido = obter_pedido_cliente(reclamacao.get("pedido_id"))
+        registrar_evento("reclamacao_analisada", "Reclamação " + reclamacao_id + " analisada; categoria " + categoria + ".")
+        return {
+            "status": "executado",
+            "acao": "analisar_reclamacao",
+            "resultado": {
+                "receita": 0, "custo": 0,
+                "reclamacao_id": reclamacao_id,
+                "categoria": categoria,
+                "providencia": providencia,
+                "pedido_id": reclamacao.get("pedido_id"),
+                "pedido_status": (pedido or {}).get("status")
+            }
+        }
 
     def criar_oferta(self, decisao):
         anterior = decisao.get("resultado_anterior") or {}
