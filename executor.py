@@ -244,8 +244,9 @@ class Executor:
         }
 
     def executar_pedido(self, decisao):
-        """Produz um resultado operacional verificável para um pedido pago."""
+        """Produz o resultado real do serviço contratado usando o Cérebro da EVOLIA."""
         from memory import obter_pedido_cliente, atualizar_pedido_cliente
+        from ai import gerar_resultado_servico
         from pedido_fluxo import sincronizar_pedido_pagamento
 
         pedido_id = str(decisao.get("pedido_id") or "").strip()
@@ -265,11 +266,6 @@ class Executor:
                 "pedido_status": pedido.get("status")
             }
 
-        servico = str(pedido.get("servico") or "Serviço contratado").strip()
-        descricao = str(pedido.get("descricao") or "").strip()
-        proposta = pedido.get("proposta") or {}
-        escopo = proposta.get("escopo") or [servico]
-
         execucao_anterior = pedido.get("execucao") or {}
         if execucao_anterior.get("status") == "resultado_pronto" and execucao_anterior.get("resultado"):
             return {
@@ -285,20 +281,37 @@ class Executor:
                 }
             }
 
+        producao = gerar_resultado_servico(pedido)
+        if producao.get("status") != "sucesso":
+            registrar_evento(
+                "pedido_producao_bloqueada",
+                "Produção do pedido " + pedido_id + " bloqueada: " + str(producao.get("erro") or "erro desconhecido")
+            )
+            return {
+                "status": "bloqueado",
+                "acao": "executar_pedido",
+                "pedido_id": pedido_id,
+                "motivo": producao.get("erro") or "Não foi possível produzir o serviço.",
+                "modelo_utilizado": producao.get("modelo_utilizado")
+            }
+
+        dados = producao.get("resultado") or {}
         artefato = {
             "tipo": "resultado_de_servico",
-            "servico": servico,
-            "descricao_cliente": descricao,
-            "escopo": escopo,
-            "conteudo": (
-                "Resultado produzido pela EVOLIA para o serviço contratado: " + servico +
-                ".\n\nContexto do pedido:\n" + (descricao or "Não informado.") +
-                "\n\nEscopo registrado:\n- " + "\n- ".join(str(x) for x in escopo)
-            ),
+            "servico": str(pedido.get("servico") or "").strip(),
+            "descricao_cliente": str(pedido.get("descricao") or "").strip(),
+            "escopo": (pedido.get("proposta") or {}).get("escopo") or [],
+            "titulo": dados.get("titulo"),
+            "conteudo": dados.get("entrega"),
+            "itens_entregues": dados.get("itens_entregues") or [],
+            "limitacoes": dados.get("limitacoes") or [],
+            "fontes": dados.get("fontes") or [],
+            "confianca": dados.get("confianca"),
             "validacao": {
                 "pedido_pago": True,
-                "escopo_presente": bool(escopo),
+                "escopo_presente": bool((pedido.get("proposta") or {}).get("escopo")),
                 "conteudo_gerado": True,
+                "producao_por_ia": True,
                 "envio_externo": False
             },
             "produzido_em": agora()
@@ -312,9 +325,9 @@ class Executor:
         atualizado = atualizar_pedido_cliente(
             pedido_id,
             execucao=execucao,
-            observacao="Resultado operacional produzido e aguardando validação/entrega."
+            observacao="Resultado real do serviço produzido pela IA e aguardando validação/entrega."
         )
-        registrar_evento("pedido_executado", "Resultado produzido para o pedido " + pedido_id + ".")
+        registrar_evento("pedido_executado", "Resultado real produzido para o pedido " + pedido_id + ".")
 
         return {
             "status": "executado",
