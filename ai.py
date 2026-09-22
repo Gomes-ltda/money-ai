@@ -124,19 +124,28 @@ def analisar_oportunidade(
     # 2. PESQUISA
     # =========================================================
 
-    consultas = [
-        objetivo,
-        f"mercado e oportunidades {objetivo}",
-        f"clientes e demanda {objetivo}",
-        f"serviços com demanda {localizacao}",
-        f"tendências de mercado Brasil {objetivo}",
-        f"formas legítimas de monetizar {objetivo}"
-    ]
+    # Pesquisa adaptativa: depois que o funil comercial já avançou, não
+    # desperdiçamos ciclos repetindo pesquisa ampla de mercado.
+    fase_comercial = estado_comercial.get("fase", "pesquisa")
+    ultima_acao = estado_comercial.get("ultima_acao_externa") or {}
+    if fase_comercial in {"aguardando_autorizacao", "autorizado", "contato_executado", "resposta", "interesse", "venda"}:
+        alvo_atual = ultima_acao.get("alvo") or ""
+        canal_atual = ultima_acao.get("canal") or ""
+        consultas = [
+            f"status público e informações atuais de {alvo_atual}" if alvo_atual else f"clientes e demanda {objetivo}",
+            f"{canal_atual} {alvo_atual} contato e atividade recente" if alvo_atual else f"demanda atual {objetivo} {localizacao}"
+        ]
+    else:
+        consultas = [
+            objetivo,
+            f"mercado e oportunidades {objetivo}",
+            f"clientes e demanda {objetivo}",
+            f"serviços com demanda {localizacao}",
+            f"tendências de mercado Brasil {objetivo}",
+            f"formas legítimas de monetizar {objetivo}"
+        ]
 
-    pesquisa = pesquisar_varias(
-        consultas,
-        localizacao
-    )
+    pesquisa = pesquisar_varias(consultas, localizacao)
 
     fontes = pesquisa[:40]
 
@@ -201,7 +210,10 @@ REGRA DO FUNIL:
 O estado comercial representa o progresso real. Se houver ação aguardando autorização, aguarde em vez de criar outro alvo equivalente. Se houver ação executada sem resposta, priorize acompanhamento antes de reiniciar a prospecção. Se houver interesse, avance para proposta. Se houver venda confirmada, priorize medição e expansão.
 
 REGRA DO CICLO:
-O ciclo anterior é a experiência mais recente da Evolia. Não reinicie o processo do zero. Determine o que aconteceu, quais evidências foram obtidas, o que não foi concluído e qual é a consequência lógica para ESTE ciclo. Se encontrou um alvo válido, avance; se não encontrou evidência suficiente, mude a pesquisa; se preparou uma ação externa, não duplique o alvo; se houve resultado financeiro positivo, aprofunde a estratégia; se houve perda financeira repetida, modifique a estratégia.
+O ciclo anterior é a experiência mais recente da Evolia. Não reinicie o processo do zero. Determine o que aconteceu, quais evidências foram obtidas, o que não foi concluído e qual é a consequência lógica para ESTE ciclo.
+Se o ciclo anterior já executou uma etapa com sucesso, trate essa etapa como concluída e escolha a próxima etapa, salvo se houver evidência concreta de que precisa ser refeita.
+Se houver um alvo validado ou uma abordagem preparada/executada, não volte para pesquisa ampla de mercado: trabalhe a continuidade daquele alvo.
+Se a única informação obtida foi insuficiente, aí sim refaça a pesquisa de forma diferente. Se encontrou um alvo válido, avance; se não encontrou evidência suficiente, mude a pesquisa; se preparou uma ação externa, não duplique o alvo; se houve resultado financeiro positivo, aprofunde a estratégia; se houve perda financeira repetida, modifique a estratégia.
 
 Use o desempenho acima como evidência. Estratégias sem resultado financeiro positivo não devem ser tratadas como validadas. Resultados zero significam que ainda não houve receita real. Abordagens preparadas ou enviadas, sem resposta ou venda confirmada, não devem ser tratadas como receita. Testes internos com receita zero não são, por si só, fracassos financeiros. Se uma estratégia tiver evidência repetida de baixo desempenho, procure uma variação ou outra oportunidade em vez de repetir mecanicamente.
 
