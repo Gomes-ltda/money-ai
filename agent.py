@@ -81,7 +81,9 @@ def executar_ciclo_pedido(pedido_id, localizacao="Brasil"):
             execucao={"acao": "analisar_pedido_cliente", "status": "bloqueado", "pedido_id": pedido_id},
             medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "aguardando_cerebro"},
             aprendizado="O pedido precisa ser reavaliado quando o Cérebro estiver disponível.",
-            proxima_acao="Retomar a análise deste pedido."
+            proxima_acao="Retomar a análise deste pedido.",
+            tipo="pedido_cliente",
+            pedido_id=pedido_id
         )
         return {
             "status": "aguardando_cerebro",
@@ -141,7 +143,9 @@ def executar_ciclo_pedido(pedido_id, localizacao="Brasil"):
         execucao=execucao,
         medicao={"receita": 0, "custo": 0, "resultado": 0, "status": "proposta_preparada"},
         aprendizado="O pedido foi transformado em uma proposta estruturada sem executar comunicação externa.",
-        proxima_acao="Revisar e autorizar a publicação da proposta ao cliente."
+        proxima_acao="Revisar e autorizar a publicação da proposta ao cliente.",
+        tipo="pedido_cliente",
+        pedido_id=pedido_id
     )
     return {
         "status": "proposta_preparada",
