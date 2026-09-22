@@ -7,7 +7,7 @@ from memory import registrar_evento, registrar_teste, registrar_acao_externa, ob
 
 ACOES_INTERNAS = {
     "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "criar_oferta",
-    "criar_proposta", "criar_conteudo", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "processar_resposta", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
+    "criar_proposta", "criar_conteudo", "executar_pedido", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "processar_resposta", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
 }
 
 def agora():
@@ -44,6 +44,8 @@ class Executor:
                 resultado = self.criar_proposta(decisao)
             elif acao == "criar_conteudo":
                 resultado = self.criar_conteudo(decisao)
+            elif acao == "executar_pedido":
+                resultado = self.executar_pedido(decisao)
             elif acao == "pesquisar_alvo":
                 resultado = self.pesquisar_alvo(decisao)
             elif acao == "validar_alvo":
@@ -237,6 +239,93 @@ class Executor:
                 "resposta_preparada": resposta,
                 "envio_externo": False
             }
+        }
+
+    def executar_pedido(self, decisao):
+        """Produz um resultado operacional verificável para um pedido pago."""
+        from memory import obter_pedido_cliente, atualizar_pedido_cliente
+        from pedido_fluxo import sincronizar_pedido_pagamento
+
+        pedido_id = str(decisao.get("pedido_id") or "").strip()
+        pedido = obter_pedido_cliente(pedido_id)
+        if not pedido:
+            return {"status": "bloqueado", "acao": "executar_pedido", "motivo": "Pedido não encontrado."}
+
+        if pedido.get("status") == "aguardando_pagamento":
+            sincronizar_pedido_pagamento(pedido_id)
+            pedido = obter_pedido_cliente(pedido_id) or pedido
+
+        if pedido.get("status") != "em_execucao":
+            return {
+                "status": "bloqueado",
+                "acao": "executar_pedido",
+                "motivo": "O pedido precisa estar em execução após pagamento confirmado.",
+                "pedido_status": pedido.get("status")
+            }
+
+        servico = str(pedido.get("servico") or "Serviço contratado").strip()
+        descricao = str(pedido.get("descricao") or "").strip()
+        proposta = pedido.get("proposta") or {}
+        escopo = proposta.get("escopo") or [servico]
+
+        execucao_anterior = pedido.get("execucao") or {}
+        if execucao_anterior.get("status") == "resultado_pronto" and execucao_anterior.get("resultado"):
+            return {
+                "status": "executado",
+                "acao": "executar_pedido",
+                "resultado": {
+                    "receita": 0,
+                    "custo": 0,
+                    "pedido_id": pedido_id,
+                    "status": "resultado_pronto",
+                    "resultado": execucao_anterior.get("resultado"),
+                    "ja_existente": True
+                }
+            }
+
+        artefato = {
+            "tipo": "resultado_de_servico",
+            "servico": servico,
+            "descricao_cliente": descricao,
+            "escopo": escopo,
+            "conteudo": (
+                "Resultado produzido pela EVOLIA para o serviço contratado: " + servico +
+                ".\n\nContexto do pedido:\n" + (descricao or "Não informado.") +
+                "\n\nEscopo registrado:\n- " + "\n- ".join(str(x) for x in escopo)
+            ),
+            "validacao": {
+                "pedido_pago": True,
+                "escopo_presente": bool(escopo),
+                "conteudo_gerado": True,
+                "envio_externo": False
+            },
+            "produzido_em": agora()
+        }
+
+        execucao = {
+            "status": "resultado_pronto",
+            "iniciada_em": agora(),
+            "resultado": artefato
+        }
+        atualizado = atualizar_pedido_cliente(
+            pedido_id,
+            execucao=execucao,
+            observacao="Resultado operacional produzido e aguardando validação/entrega."
+        )
+        registrar_evento("pedido_executado", "Resultado produzido para o pedido " + pedido_id + ".")
+
+        return {
+            "status": "executado",
+            "acao": "executar_pedido",
+            "resultado": {
+                "receita": 0,
+                "custo": 0,
+                "pedido_id": pedido_id,
+                "status": "resultado_pronto",
+                "resultado": artefato,
+                "envio_externo": False
+            },
+            "pedido": atualizado
         }
 
     def criar_oferta(self, decisao):
