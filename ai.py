@@ -298,6 +298,8 @@ Se já existir uma estratégia pronta para teste:
 Se a oportunidade já estiver definida, mas ainda não houver um alvo público específico:
 "pesquisar_alvo"
 
+Antes de pesquisar um novo alvo, verifique os LEADS PERSISTIDOS NA MEMÓRIA. Se existir um lead validado, relevante para a estratégia atual e ainda não houver abordagem executada para ele, reutilize esse alvo em vez de fazer nova prospecção.
+
 Se existir um alvo público encontrado, mas ainda faltar evidência suficiente para confirmar aderência ao problema:
 "validar_alvo"
 
