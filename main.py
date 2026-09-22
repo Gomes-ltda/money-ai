@@ -7,7 +7,7 @@ from memory import obter_acoes_externas, atualizar_acao_externa, registrar_feedb
 from external import iniciar_acao_autorizada, consultar_acao_externa
 from pagamentos import criar_cobranca_pix, criar_order_pix_teste, validar_webhook, processar_webhook, sincronizar_pagamento
 from pedido_fluxo import publicar_proposta, aceitar_proposta, criar_pagamento_pedido, sincronizar_pedido_pagamento, registrar_entrega, ciclo_pedido_resumo, transicionar_pedido
-from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca, obter_pagamento_por_id, registrar_pedido_cliente, obter_pedidos_clientes, obter_pedido_publico, atualizar_pedido_cliente
+from memory import obter_pagamentos, atualizar_pagamento, validar_venda_para_cobranca, obter_pagamento_por_id, registrar_pedido_cliente, obter_pedidos_clientes, obter_pedido_publico, atualizar_pedido_cliente, registrar_reclamacao, obter_reclamacoes, atualizar_reclamacao
 
 
 app = Flask(__name__)
@@ -330,6 +330,20 @@ ADMIN_HTML = """
             } catch(e) {}
         }
 
+        async function carregarReclamacoes() {
+            const box=document.getElementById("reclamacoes"), token=obterToken(); if(!token)return;
+            try{const resposta=await fetch("/reclamacoes",{headers:{"Authorization":"Bearer "+token}}); const dados=await resposta.json(); if(!resposta.ok)return;
+                const itens=(dados.reclamacoes||[]).slice().reverse();
+                if(!itens.length){box.innerHTML="<p>Nenhuma reclamação registrada.</p>";return;}
+                box.innerHTML=itens.slice(0,20).map(r=>"<div style='border:1px solid #ccc;padding:16px;margin:12px 0;border-radius:10px'><b>"+escPedido(r.assunto||"Outro")+"</b> · "+escPedido(r.status||"aberta")+"<p><b>Cliente:</b> "+escPedido(r.nome||"-")+"<br><b>Pedido:</b> "+escPedido(r.pedido_id||"-")+"<br><b>Contato:</b> "+escPedido(r.contato||"-")+"</p><p style='white-space:pre-wrap'>"+escPedido(r.descricao||"")+"</p>"+(r.resposta?"<p><b>Resposta:</b> "+escPedido(r.resposta)+"</p>":"")+"<button onclick='resolverReclamacao("+JSON.stringify(r.id)+")'>Marcar como resolvida</button></div>").join("");
+            }catch(e){}
+        }
+        async function resolverReclamacao(id){
+            const token=obterToken(); if(!token)return; const resposta=prompt("Informe a resposta/resolução para o cliente:"); if(!resposta||!resposta.trim())return;
+            const r=await fetch("/reclamacoes/"+encodeURIComponent(id),{method:"POST",headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({status:"resolvida",resposta:resposta,resolucao:resposta})});
+            const d=await r.json(); if(!r.ok){alert(d.erro||"Não foi possível atualizar a reclamação.");return;} carregarReclamacoes();
+        }
+
         async function carregarPagamentos() {
             const resultado = document.getElementById("pagamentos");
             const token = obterToken();
@@ -548,6 +562,7 @@ ADMIN_HTML = """
                 sincronizarPedidosAutomaticamente();
                 carregarAcoesEmAndamento();
                 carregarHistorico();
+                carregarReclamacoes();
                 sincronizarPagamentosAutomaticamente();
                 carregarPagamentos();
                 intervaloAcoes = setInterval(() => {
@@ -557,6 +572,7 @@ ADMIN_HTML = """
                         sincronizarPedidosAutomaticamente();
                         carregarAcoesEmAndamento();
                         carregarHistorico();
+                        carregarReclamacoes();
                         sincronizarPagamentosAutomaticamente();
                         carregarPagamentos();
                     }
@@ -804,9 +820,26 @@ def pedido_publico(token):
 <h1 style='font-size:30px'>""" + labels.get(status,status) + """</h1>
 <p><strong>Serviço:</strong> """ + servico_seguro + """</p>
 """ + proposta_html + acao_html + entrega_html + """
-<p style='color:#777;font-size:13px;margin-top:28px'>Este link é privado. Não compartilhe.</p>
+<div style='margin-top:24px;padding:18px;border:1px solid #ddd;border-radius:14px;background:#fff8f0'>
+<strong>Problema com o pedido?</strong><p style='color:#666'>Se algo saiu diferente do esperado, você pode registrar uma reclamação diretamente por este link.</p>
+<button onclick="abrirReclamacao()" style='background:#111;color:#fff;border:0;border-radius:10px;padding:12px 16px;cursor:pointer'>Registrar reclamação</button>
+<div id='reclamacaoBox' style='display:none;margin-top:16px'><label>Assunto</label>
+<select id='reclamacaoAssunto' style='width:100%;padding:12px;border:1px solid #ccc;border-radius:10px'><option>Atraso</option><option>Problema na entrega</option><option>Problema no serviço</option><option>Valor/cobrança</option><option>Outro</option></select>
+<label style='display:block;margin:12px 0 7px'>Descreva o problema</label><textarea id='reclamacaoDescricao' maxlength='4000' style='width:100%;min-height:120px;padding:12px;border:1px solid #ccc;border-radius:10px' placeholder='Explique o que aconteceu.'></textarea>
+<button onclick="enviarReclamacao()" style='margin-top:10px;background:#111;color:#fff;border:0;border-radius:10px;padding:12px 16px;cursor:pointer'>Enviar reclamação</button>
+<div id='reclamacaoStatus' style='margin-top:12px'></div></div></div><p style='color:#777;font-size:13px;margin-top:28px'>Este link é privado. Não compartilhe.</p>
 </div></main>
 <script>
+function abrirReclamacao(){document.getElementById('reclamacaoBox').style.display='block';}
+async function enviarReclamacao(){
+ const box=document.getElementById('reclamacaoStatus'); const descricao=document.getElementById('reclamacaoDescricao').value.trim();
+ if(!descricao){box.textContent='Descreva o problema antes de enviar.';return;} box.textContent='Enviando reclamação...';
+ try{
+  const r=await fetch('/pedido/""" + token + """/reclamacao',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assunto:document.getElementById('reclamacaoAssunto').value,descricao:descricao})});
+  const d=await r.json(); if(!r.ok){box.textContent=d.erro||'Não foi possível registrar a reclamação.';return;}
+  box.textContent='Reclamação registrada. Número: '+d.reclamacao_id; document.getElementById('reclamacaoDescricao').value='';
+ }catch(e){box.textContent='Erro de conexão.';}
+}
 async function aceitarProposta(){
  const box=document.getElementById('acaoStatus'); box.textContent='Registrando aceite...';
  try{
@@ -827,6 +860,42 @@ async function gerarPagamento(){
  }catch(e){box.textContent='Erro de conexão.';}
 }
 </script></body></html>"""
+
+@app.route("/pedido/<token>/reclamacao", methods=["POST"])
+def criar_reclamacao_publica(token):
+    pedido = obter_pedido_publico(token)
+    if not pedido:
+        return jsonify({"erro": "Pedido não encontrado."}), 404
+    dados = request.get_json(silent=True) or {}
+    assunto = str(dados.get("assunto") or "Outro").strip()
+    descricao = str(dados.get("descricao") or "").strip()
+    if not descricao:
+        return jsonify({"erro": "Descreva o problema."}), 400
+    reclamacao = registrar_reclamacao(
+        pedido_id=pedido["id"], token_publico=token, nome=pedido.get("nome"),
+        contato=pedido.get("email") or pedido.get("whatsapp") or pedido.get("instagram") or "",
+        assunto=assunto, descricao=descricao
+    )
+    return jsonify({"status":"registrada","reclamacao_id":reclamacao["id"]}), 201
+
+@app.route("/reclamacoes")
+def listar_reclamacoes():
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    return jsonify({"reclamacoes": obter_reclamacoes()})
+
+@app.route("/reclamacoes/<reclamacao_id>", methods=["POST"])
+def resolver_reclamacao(reclamacao_id):
+    if not validar_token():
+        return jsonify({"erro": "Token de autorização inválido ou não configurado."}), 401
+    dados = request.get_json(silent=True) or {}
+    status = str(dados.get("status") or "").strip()
+    if status not in {"em_analise","resolvida","encerrada"}:
+        return jsonify({"erro": "Status de reclamação inválido."}), 400
+    reclamacao = atualizar_reclamacao(reclamacao_id, status=status, resposta=dados.get("resposta"), resolucao=dados.get("resolucao"))
+    if not reclamacao:
+        return jsonify({"erro": "Reclamação não encontrada."}), 404
+    return jsonify({"status":"atualizada","reclamacao":reclamacao})
 
 @app.route("/pedidos-clientes")
 def pedidos_clientes():
