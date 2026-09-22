@@ -577,6 +577,27 @@ def obter_metricas_comerciais(limite=100):
     return metricas
 
 
+def obter_estado_comercial(estrategia=None):
+    memoria = carregar_memoria()
+    acoes = memoria.get("acoes_externas", [])
+    if estrategia:
+        acoes = [x for x in acoes if x.get("estrategia") == estrategia]
+    estados = {"aguardando_autorizacao": 0, "autorizadas": 0, "executadas": 0, "falhas": 0, "com_resposta": 0, "com_interesse": 0, "vendas": 0}
+    ultimas = []
+    for acao in acoes[-50:]:
+        status = acao.get("status")
+        if status == "aguardando_autorizacao": estados["aguardando_autorizacao"] += 1
+        elif status == "autorizada": estados["autorizadas"] += 1
+        elif status == "executada": estados["executadas"] += 1
+        elif status == "falhou": estados["falhas"] += 1
+        feedbacks = acao.get("feedback", []) or []
+        if any(f.get("resposta") for f in feedbacks): estados["com_resposta"] += 1
+        if any(f.get("interesse") for f in feedbacks): estados["com_interesse"] += 1
+        if any(f.get("venda") for f in feedbacks): estados["vendas"] += 1
+        ultimas.append({"id": acao.get("id"), "status": status, "alvo": acao.get("alvo"), "canal": acao.get("canal"), "estrategia": acao.get("estrategia")})
+    return {"funil": estados, "ultima_acao_externa": ultimas[-1] if ultimas else None, "ultimas_acoes": ultimas[-10:]}
+
+
 def obter_acoes_externas(status=None, limite=20):
     memoria = carregar_memoria()
     acoes = memoria["acoes_externas"]
