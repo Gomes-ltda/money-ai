@@ -680,7 +680,7 @@ footer{background:#111;color:#aaa;padding:30px 0}
 </main>
 <footer><div class="wrap">Evolia AI · Serviços digitais</div></footer>
 <script>
-function carregarMeusPedidos(){const b=document.getElementById("listaMeusPedidos");if(!b)return;let p=[];try{p=JSON.parse(localStorage.getItem("evolia_pedidos")||"[]")}catch(e){};b.innerHTML=p.length?p.map(x=>"<div style=\"border:1px solid #ddd;border-radius:12px;padding:14px;margin:10px 0\"><strong>Pedido "+x.id+"</strong><p class=\"small\">Solicitado em "+new Date(x.criado_em).toLocaleString("pt-BR")+"</p><a class=\"btn\" href=\""+x.url+"\">Acompanhar pedido</a></div>").join(""):"<p class=\"small\">Nenhum pedido salvo neste dispositivo.</p>"}
+async function carregarMeusPedidos(){const b=document.getElementById("listaMeusPedidos");if(!b)return;try{const r=await fetch("/meus-pedidos",{credentials:"same-origin"});const d=await r.json();if(!r.ok){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos.</p>";return;}const p=d.pedidos||[];b.innerHTML=p.length?p.map(x=>"<div style=\"border:1px solid #ddd;border-radius:12px;padding:14px;margin:10px 0\"><strong>Pedido "+x.id+"</strong><p class=\"small\">Status: "+x.status_label+"</p><a class=\"btn\" href=\""+x.url+"\">Acompanhar pedido</a></div>").join(""):"<p class='small'>Nenhum pedido encontrado neste navegador.</p>"}catch(e){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos agora.</p>"}}
 async function enviarPedido(event){
  event.preventDefault();
  const box=document.getElementById("pedidoResultado");
@@ -695,7 +695,7 @@ async function enviarPedido(event){
   })});
   const d=await r.json();
   if(!r.ok){box.textContent=d.erro||"Não foi possível enviar o pedido.";return;}
-  try{const pedidos=JSON.parse(localStorage.getItem("evolia_pedidos")||"[]"); pedidos.unshift({id:d.pedido_id,url:d.url_publica,criado_em:new Date().toISOString()}); localStorage.setItem("evolia_pedidos",JSON.stringify(pedidos.slice(0,20)));}catch(e){}
+  try{await fetch("/meus-pedidos/registrar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:d.url_publica.split("/pedido/")[1]||""}),credentials:"same-origin"});}catch(e){}
   carregarMeusPedidos();
   box.innerHTML="<strong>Pedido recebido.</strong><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
   document.getElementById("pedidoForm").reset();
@@ -738,7 +738,7 @@ def solicitar():
     # O pedido é registrado primeiro e a resposta é devolvida imediatamente.
     # O ciclo da EVOLIA continua pelo processamento operacional, sem bloquear o formulário do cliente.
     url_publica = request.host_url.rstrip("/") + "/pedido/" + pedido["token_publico"]
-    return jsonify({
+    resposta = jsonify({
         "status": "recebido",
         "pedido_id": pedido["id"],
         "url_publica": url_publica,
@@ -747,6 +747,41 @@ def solicitar():
             "proposta_preparada": False
         }
     }), 201
+    resposta.set_cookie("evolia_pedidos", pedido["token_publico"], max_age=60*60*24*365, httponly=True, samesite="Lax", secure=request.is_secure)
+    return resposta
+
+
+@app.route("/meus-pedidos/registrar", methods=["POST"])
+def registrar_meu_pedido():
+    dados = request.get_json(silent=True) or {}
+    token = str(dados.get("token") or "").strip()
+    pedido = obter_pedido_publico(token) if token else None
+    if not pedido:
+        return jsonify({"erro": "Pedido inválido."}), 400
+    atuais = [x.strip() for x in request.cookies.get("evolia_pedidos", "").split(",") if x.strip()]
+    if token not in atuais:
+        atuais.insert(0, token)
+    atuais = atuais[:20]
+    resposta = jsonify({"status": "registrado"})
+    resposta.set_cookie("evolia_pedidos", ",".join(atuais), max_age=60*60*24*365, httponly=True, samesite="Lax", secure=request.is_secure)
+    return resposta
+
+
+@app.route("/meus-pedidos")
+def meus_pedidos():
+    tokens = [x.strip() for x in request.cookies.get("evolia_pedidos", "").split(",") if x.strip()]
+    labels = {"recebido":"Solicitação recebida","em_analise":"Em análise","proposta_preparada":"Proposta em preparação","proposta_enviada":"Proposta disponível para sua decisão","aguardando_pagamento":"Aguardando pagamento","em_execucao":"Em execução","entregue":"Entrega disponível","cancelado":"Pedido encerrado"}
+    pedidos = []
+    vistos = set()
+    for token in tokens:
+        if token in vistos:
+            continue
+        pedido = obter_pedido_publico(token)
+        if not pedido:
+            continue
+        vistos.add(token)
+        pedidos.append({"id": pedido.get("id"), "status": pedido.get("status"), "status_label": labels.get(pedido.get("status"), pedido.get("status") or "Em acompanhamento"), "url": request.host_url.rstrip("/") + "/pedido/" + token, "criado_em": pedido.get("criado_em")})
+    return jsonify({"pedidos": pedidos[:20]})
 
 
 @app.route("/pedido/<token>")
