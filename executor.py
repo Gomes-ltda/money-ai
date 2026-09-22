@@ -6,7 +6,7 @@ from pesquisa import pesquisar
 from memory import registrar_evento, registrar_teste, registrar_acao_externa, obter_acoes_externas, registrar_lead, obter_leads, atualizar_lead
 
 ACOES_INTERNAS = {
-    "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "criar_oferta",
+    "aguardar", "pesquisar", "analisar", "analisar_reclamacao", "resolver_reclamacao", "analisar_pedido_cliente", "criar_oferta",
     "criar_proposta", "criar_conteudo", "executar_pedido", "validar_resultado", "preparar_abordagem", "preparar_followup", "acompanhar_lead", "processar_resposta", "medir_resultado", "pesquisar_alvo", "validar_alvo", "testar_estrategia"
 }
 
@@ -38,6 +38,9 @@ class Executor:
                 resultado = self.analisar_reclamacao(decisao)
             elif acao == "resolver_reclamacao":
                 resultado = self.resolver_reclamacao(decisao)
+            elif acao == "analisar_pedido_cliente":
+                from agent import executar_ciclo_pedido
+                resultado = executar_ciclo_pedido(decisao.get("pedido_id"), decisao.get("localizacao", "Brasil"))
             elif acao == "criar_oferta":
                 resultado = self.criar_oferta(decisao)
             elif acao == "criar_proposta":
