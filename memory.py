@@ -590,6 +590,8 @@ def obter_estado_comercial(estrategia=None):
         elif status == "autorizada": estados["autorizadas"] += 1
         elif status == "executada": estados["executadas"] += 1
         elif status == "falhou": estados["falhas"] += 1
+        if acao.get("tipo") == "followup_comercial": estados["followups"] += 1
+        estados["ultimo_status"] = status
         feedbacks = acao.get("feedback", []) or []
         if any(f.get("resposta") for f in feedbacks): estados["com_resposta"] += 1
         if any(f.get("interesse") for f in feedbacks): estados["com_interesse"] += 1
