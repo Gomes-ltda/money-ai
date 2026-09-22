@@ -328,6 +328,7 @@ def executar_ciclo(objetivo, localizacao="Brasil"):
         # Mantém o último resultado útil do ciclo anterior quando a
         # estratégia é a mesma, permitindo continuidade real entre ciclos.
         resultado_anterior_ciclo = None
+        estrategia = detalhes.get("estrategia")
         ciclo_execucao_anterior = (ciclo_anterior or {}).get("execucao", {}) if isinstance(ciclo_anterior, dict) else {}
         execucoes_anteriores = ciclo_execucao_anterior.get("execucoes", []) if isinstance(ciclo_execucao_anterior, dict) else []
         estrategia_anterior = ((ciclo_anterior or {}).get("decisao", {}) or {}).get("estrategia") if isinstance(ciclo_anterior, dict) else None
