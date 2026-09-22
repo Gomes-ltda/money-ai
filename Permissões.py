@@ -12,6 +12,7 @@ PERMISSOES_PADRAO = {
     "analisar": True,
     "analisar_reclamacao": True,
     "resolver_reclamacao": True,
+    "analisar_pedido_cliente": True,
     "criar_oferta": True,
     "criar_proposta": True,
     "criar_conteudo": True,
