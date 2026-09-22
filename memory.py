@@ -610,7 +610,13 @@ def obter_estado_comercial(estrategia=None):
         fase = "aguardando_autorizacao"
     elif estados["autorizadas"] > 0:
         fase = "autorizado"
-    return {"funil": estados, "fase": fase, "ultima_acao_externa": ultimas[-1] if ultimas else None, "ultimas_acoes": ultimas[-10:]}
+    return {
+        "funil": estados,
+        "fase": fase,
+        "ultima_acao_externa": ultimas[-1] if ultimas else None,
+        "ultimas_acoes": ultimas[-10:],
+        "aguardando_acao_usuario": estados["aguardando_autorizacao"] > 0
+    }
 
 
 def obter_acoes_externas(status=None, limite=20):
