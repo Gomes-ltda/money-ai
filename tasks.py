@@ -1,6 +1,6 @@
 import uuid
 
-from memory import registrar_tarefa, atualizar_tarefa
+from memory import registrar_tarefa, atualizar_tarefa, obter_ultimo_ciclo
 
 
 ACOES_INTERNAS = {
@@ -49,8 +49,36 @@ def criar_tarefas(decisao):
             indice for indice, (acao_tarefa, _) in enumerate(CADEIA_PROCESSO)
             if acao_tarefa == acao
         )
-        for acao_tarefa, descricao in CADEIA_PROCESSO[indice:]:
-            adicionar(acao_tarefa, descricao)
+
+        # Se o último ciclo da mesma estratégia já concluiu etapas anteriores,
+        # começa da próxima etapa útil em vez de reconstruir tudo.
+        ultimo = obter_ultimo_ciclo() or {}
+        decisao_anterior = ultimo.get("decisao") or {}
+        mesma_estrategia = (
+            decisao.get("estrategia")
+            and decisao.get("estrategia") == decisao_anterior.get("estrategia")
+        )
+        concluidas = set()
+        if mesma_estrategia:
+            for execucao in (ultimo.get("execucao") or {}).get("execucoes", []) or []:
+                if execucao.get("status") in {"executado", "concluida"}:
+                    acao_concluida = execucao.get("acao")
+                    if acao_concluida:
+                        concluidas.add(acao_concluida)
+
+        cadeia = CADEIA_PROCESSO[indice:]
+        if concluidas:
+            cadeia = [
+                item for item in cadeia
+                if item[0] not in concluidas
+            ]
+        if not cadeia:
+            # Nada novo a executar nesta cadeia; deixa o agente decidir a
+            # próxima ação comercial em vez de repetir tarefas.
+            adicionar("acompanhar_lead", "Reavaliar o estado comercial após etapas já concluídas.")
+        else:
+            for acao_tarefa, descricao in cadeia:
+                adicionar(acao_tarefa, descricao)
     elif acao == "criar_conteudo":
         adicionar("criar_conteudo", "Produzir o material de teste.")
     elif acao in {"pesquisar_alvo", "validar_alvo"}:
