@@ -1,0 +1,8 @@
+name: Evolia autonomous cycle
+on:
+  workflow_dispatch:
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Autonomous cycle workflow ready"
