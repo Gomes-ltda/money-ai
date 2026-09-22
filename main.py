@@ -697,10 +697,12 @@ async function enviarPedido(event){
   if(!r.ok){box.textContent=d.erro||"Não foi possível enviar o pedido.";return;}
   try{await fetch("/meus-pedidos/registrar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:d.url_publica.split("/pedido/")[1]||""}),credentials:"same-origin"});}catch(e){}
   carregarMeusPedidos();
-  box.innerHTML="<strong>Pedido recebido.</strong><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
+  box.innerHTML="<strong>Pedido recebido.</strong><div id='pedidoAoVivo' style='margin-top:14px;padding:14px;border:1px solid #ddd;border-radius:12px'><p class='small'>Carregando acompanhamento...</p></div><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
+  acompanharPedidoAoVivo(d.url_publica);
   document.getElementById("pedidoForm").reset();
  }catch(e){box.textContent="Erro de conexão. Tente novamente.";}
 }
+async function acompanharPedidoAoVivo(url){const box=document.getElementById("pedidoAoVivo");if(!box)return;const token=url.split("/pedido/")[1]||"";async function atualizar(){try{const r=await fetch("/pedido/"+encodeURIComponent(token)+"/dados");const d=await r.json();if(!r.ok)return;let h="<strong>Status:</strong> "+d.status_label;if(d.proposta_publicada&&d.proposta){h+="<hr><strong>Proposta disponível</strong><p>"+String(d.proposta.texto||"").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>")+"</p>";if(d.proposta.valor!=null)h+="<p><strong>Valor:</strong> R$ "+Number(d.proposta.valor).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</p>";if(d.status==="proposta_enviada")h+="<p><a class='btn' href='"+url+"'>Abrir proposta e aceitar</a></p>";}box.innerHTML=h;}catch(e){}}await atualizar();const antigo=window.evoliaPedidoInterval; if(antigo)clearInterval(antigo);window.evoliaPedidoInterval=setInterval(atualizar,5000)}
 carregarMeusPedidos();
 </script>
 </body>
@@ -746,7 +748,8 @@ def solicitar():
             "status": "pendente",
             "proposta_preparada": False
         }
-    }), 201
+    })
+    resposta.status_code = 201
     resposta.set_cookie("evolia_pedidos", pedido["token_publico"], max_age=60*60*24*365, httponly=True, samesite="Lax", secure=request.is_secure)
     return resposta
 
@@ -782,6 +785,18 @@ def meus_pedidos():
         vistos.add(token)
         pedidos.append({"id": pedido.get("id"), "status": pedido.get("status"), "status_label": labels.get(pedido.get("status"), pedido.get("status") or "Em acompanhamento"), "url": request.host_url.rstrip("/") + "/pedido/" + token, "criado_em": pedido.get("criado_em")})
     return jsonify({"pedidos": pedidos[:20]})
+
+
+@app.route("/pedido/<token>/dados")
+def pedido_dados(token):
+    pedido = obter_pedido_publico(token)
+    if not pedido:
+        return jsonify({"erro": "Pedido não encontrado."}), 404
+    status = pedido.get("status", "recebido")
+    labels = {"recebido":"Solicitação recebida","em_analise":"Em análise","proposta_preparada":"Proposta em preparação","proposta_enviada":"Proposta disponível para sua decisão","aguardando_pagamento":"Aguardando pagamento","em_execucao":"Em execução","entregue":"Entrega disponível","cancelado":"Pedido encerrado"}
+    proposta = pedido.get("proposta") or {}
+    publicada = status in {"proposta_enviada","aguardando_pagamento","em_execucao","entregue"}
+    return jsonify({"pedido_id":pedido.get("id"),"status":status,"status_label":labels.get(status,status),"proposta_publicada":publicada,"proposta":proposta if publicada else None})
 
 
 @app.route("/pedido/<token>")
