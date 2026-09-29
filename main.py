@@ -664,7 +664,7 @@ footer{background:#111;color:#aaa;padding:30px 0}
 <div class="form-card">
 <h2>Solicitar orçamento</h2>
 <p class="section-intro">Preencha o formulário. Ao enviar, você receberá um link privado para acompanhar o pedido.</p>
-<form id="pedidoForm" onsubmit="enviarPedido(event)">
+<form id="pedidoForm" onsubmit="return enviarPedido(event)">
 <label>Nome</label><input id="nome" required maxlength="100" placeholder="Seu nome ou empresa">
 <label>E-mail</label><input id="email" type="email" maxlength="160" placeholder="voce@exemplo.com">
 <label>WhatsApp</label><input id="whatsapp" maxlength="30" placeholder="(00) 00000-0000">
@@ -673,7 +673,7 @@ footer{background:#111;color:#aaa;padding:30px 0}
 <select id="servico" required><option value="">Selecione</option><option>Textos comerciais</option><option>Pesquisa e organização</option><option>Solução sob medida</option><option>Outro</option></select>
 <label>Descreva o pedido</label><textarea id="descricao" required maxlength="4000" placeholder="Explique o que você precisa e qual resultado espera."></textarea>
 <p class="small">Não envie senhas, documentos sensíveis ou dados bancários pelo formulário.</p>
-<button id="botaoEnviarPedido" class="btn" type="button" onclick="enviarPedido()">Enviar solicitação</button>
+<button id="botaoEnviarPedido" class="btn" type="submit">Enviar solicitação</button>
 </form>
 <div id="pedidoResultado"></div>
 </div></div></section>
@@ -694,7 +694,8 @@ async function carregarMeusPedidos(){
   b.innerHTML=p.length?p.map(x=>"<div style=\"border:1px solid #ddd;border-radius:12px;padding:14px;margin:10px 0\"><strong>Pedido "+x.id+"</strong><p class=\"small\">Status: "+x.status_label+"</p><a class=\"btn\" href=\""+x.url+"\">Acompanhar pedido</a></div>").join(""):"<p class='small'>Nenhum pedido encontrado neste navegador.</p>";
  }catch(e){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos agora.</p>";}
 }
-async function enviarPedido(){
+async function enviarPedido(event){
+ if(event) event.preventDefault();
  const box=document.getElementById("pedidoResultado");
  const botao=document.getElementById("botaoEnviarPedido");
  const form=document.getElementById("pedidoForm");
@@ -712,7 +713,10 @@ async function enviarPedido(){
   modo_teste:true
  };
  try{
-  const r=await fetch("/solicitar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),cache:"no-store"});
+  const controlador=new AbortController();
+  const temporizador=setTimeout(()=>controlador.abort(),30000);
+  const r=await fetch("/solicitar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),cache:"no-store",credentials:"same-origin",signal:controlador.signal});
+  clearTimeout(temporizador);
   const texto=await r.text();
   let d={}; try{d=texto?JSON.parse(texto):{};}catch(e){d={erro:texto||"Resposta inválida do servidor."};}
   if(!r.ok){
@@ -725,7 +729,7 @@ async function enviarPedido(){
   acompanharPedidoAoVivo(d.url_publica);
   if(form) form.reset();
  }catch(e){
-  box.textContent="Erro de conexão ao enviar o pedido. Tente novamente.";
+  box.textContent=e.name==="AbortError"?"O servidor demorou para responder. Tente novamente.":"Erro de conexão ao enviar o pedido. Tente novamente.";
  }finally{
   if(botao)botao.disabled=false;
  }
