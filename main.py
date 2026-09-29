@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template_string
 import os
+import threading
 
 from ai import analisar_oportunidade, analisar_pedido_cliente
 from agent import executar_ciclo, executar_ciclo_pedido
@@ -672,7 +673,7 @@ footer{background:#111;color:#aaa;padding:30px 0}
 <select id="servico" required><option value="">Selecione</option><option>Textos comerciais</option><option>Pesquisa e organização</option><option>Solução sob medida</option><option>Outro</option></select>
 <label>Descreva o pedido</label><textarea id="descricao" required maxlength="4000" placeholder="Explique o que você precisa e qual resultado espera."></textarea>
 <p class="small">Não envie senhas, documentos sensíveis ou dados bancários pelo formulário.</p>
-<button class="btn" type="submit">Enviar solicitação</button>
+<button id="botaoEnviarPedido" class="btn" type="button" onclick="enviarPedido()">Enviar solicitação</button>
 </form>
 <div id="pedidoResultado"></div>
 </div></div></section>
@@ -693,27 +694,62 @@ async function carregarMeusPedidos(){
   b.innerHTML=p.length?p.map(x=>"<div style=\"border:1px solid #ddd;border-radius:12px;padding:14px;margin:10px 0\"><strong>Pedido "+x.id+"</strong><p class=\"small\">Status: "+x.status_label+"</p><a class=\"btn\" href=\""+x.url+"\">Acompanhar pedido</a></div>").join(""):"<p class='small'>Nenhum pedido encontrado neste navegador.</p>";
  }catch(e){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos agora.</p>";}
 }
-async function enviarPedido(event){
- event.preventDefault();
+async function enviarPedido(){
  const box=document.getElementById("pedidoResultado");
+ const botao=document.getElementById("botaoEnviarPedido");
+ const form=document.getElementById("pedidoForm");
  box.className="result"; box.textContent="Enviando solicitação...";
+ if(botao) botao.disabled=true;
  const contato=(document.getElementById("email").value+" "+document.getElementById("whatsapp").value+" "+document.getElementById("instagram").value).trim();
- if(!contato){box.textContent="Informe pelo menos um meio de contato.";return;}
+ if(!contato){box.textContent="Informe pelo menos um meio de contato.";if(botao)botao.disabled=false;return;}
+ const payload={
+  nome:document.getElementById("nome").value,
+  email:document.getElementById("email").value,
+  whatsapp:document.getElementById("whatsapp").value,
+  instagram:document.getElementById("instagram").value,
+  servico:document.getElementById("servico").value,
+  descricao:document.getElementById("descricao").value,
+  modo_teste:true
+ };
  try{
-  const r=await fetch("/solicitar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-   nome:document.getElementById("nome").value,email:document.getElementById("email").value,
-   whatsapp:document.getElementById("whatsapp").value,instagram:document.getElementById("instagram").value,
-   servico:document.getElementById("servico").value,descricao:document.getElementById("descricao").value,modo_teste:true
-  })});
-  const d=await r.json();
-  if(!r.ok){box.textContent=d.erro||"Não foi possível enviar o pedido.";return;}
-  carregarMeusPedidos();
-  box.innerHTML="<strong>Pedido recebido.</strong><div id='pedidoAoVivo' style='margin-top:14px;padding:14px;border:1px solid #ddd;border-radius:12px'><p class='small'>Carregando acompanhamento...</p></div><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
+  const r=await fetch("/solicitar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),cache:"no-store"});
+  const texto=await r.text();
+  let d={}; try{d=texto?JSON.parse(texto):{};}catch(e){d={erro:texto||"Resposta inválida do servidor."};}
+  if(!r.ok){
+   box.textContent=d.erro||("Não foi possível enviar o pedido. HTTP "+r.status);
+   if(botao)botao.disabled=false;
+   return;
+  }
+  box.innerHTML="<strong>Pedido recebido.</strong><div id='pedidoAoVivo' style='margin-top:14px;padding:14px;border:1px solid #ddd;border-radius:12px'><p class='small'>A EVOLIA iniciou o processamento...</p></div><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
+  await carregarMeusPedidos();
   acompanharPedidoAoVivo(d.url_publica);
-  document.getElementById("pedidoForm").reset();
- }catch(e){box.textContent="Erro de conexão. Tente novamente.";}
+  if(form) form.reset();
+ }catch(e){
+  box.textContent="Erro de conexão ao enviar o pedido. Tente novamente.";
+ }finally{
+  if(botao)botao.disabled=false;
+ }
 }
-async function acompanharPedidoAoVivo(url){const box=document.getElementById("pedidoAoVivo");if(!box)return;const token=url.split("/pedido/")[1]||"";async function atualizar(){try{const r=await fetch("/pedido/"+encodeURIComponent(token)+"/dados");const d=await r.json();if(!r.ok)return;let h="<strong>Status:</strong> "+d.status_label;if(d.proposta_publicada&&d.proposta){h+="<hr><strong>Proposta disponível</strong><p>"+String(d.proposta.texto||"").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>")+"</p>";if(d.proposta.valor!=null)h+="<p><strong>Valor:</strong> R$ "+Number(d.proposta.valor).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</p>";if(d.status==="proposta_enviada")h+="<p><a class='btn' href='"+url+"'>Abrir proposta e aceitar</a></p>";}box.innerHTML=h;}catch(e){}}await atualizar();const antigo=window.evoliaPedidoInterval; if(antigo)clearInterval(antigo);window.evoliaPedidoInterval=setInterval(atualizar,5000)}
+async function acompanharPedidoAoVivo(url){
+ const box=document.getElementById("pedidoAoVivo");if(!box)return;
+ const token=url.split("/pedido/")[1]||"";
+ async function atualizar(){
+  try{
+   const r=await fetch("/pedido/"+encodeURIComponent(token)+"/dados",{cache:"no-store"});
+   const d=await r.json();if(!r.ok)return;
+   let h="<strong>Status:</strong> "+d.status_label;
+   if(d.proposta_publicada&&d.proposta){
+    h+="<hr><strong>Proposta disponível</strong><p>"+String(d.proposta.texto||"").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\\n/g,"<br>")+"</p>";
+    if(d.proposta.valor!=null)h+="<p><strong>Valor:</strong> R$ "+Number(d.proposta.valor).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</p>";
+    if(d.status==="proposta_enviada")h+="<p><a class='btn' href='"+url+"'>Abrir proposta e aceitar</a></p>";
+   }
+   box.innerHTML=h;
+  }catch(e){}
+ }
+ await atualizar();
+ const antigo=window.evoliaPedidoInterval;if(antigo)clearInterval(antigo);
+ window.evoliaPedidoInterval=setInterval(atualizar,5000);
+}
 carregarMeusPedidos();
 setInterval(carregarMeusPedidos,5000);
 </script>
@@ -744,13 +780,34 @@ def solicitar():
     if email and ("@" not in email or "." not in email.split("@")[-1]):
         return jsonify({"erro": "Informe um e-mail válido."}), 400
 
-    pedido = registrar_pedido_cliente(
-        nome=nome, email=email, whatsapp=whatsapp, instagram=instagram,
-        servico=servico, descricao=descricao, modo_teste=bool(dados.get("modo_teste", True))
-    )
+    try:
+        pedido = registrar_pedido_cliente(
+            nome=nome, email=email, whatsapp=whatsapp, instagram=instagram,
+            servico=servico, descricao=descricao, modo_teste=bool(dados.get("modo_teste", True))
+        )
+    except Exception as erro:
+        return jsonify({"erro": "Não foi possível registrar o pedido.", "detalhe": str(erro)}), 500
 
-    # O pedido é registrado primeiro e a resposta é devolvida imediatamente.
-    # O ciclo da EVOLIA continua pelo processamento operacional, sem bloquear o formulário do cliente.
+    # Registra primeiro e inicia o processamento em segundo plano para o cliente
+    # não ficar esperando a IA terminar a análise.
+    def processar_pedido_em_background(pedido_id):
+        try:
+            executar_ciclo_pedido(pedido_id)
+        except Exception as erro:
+            try:
+                atualizar_pedido_cliente(
+                    pedido_id,
+                    observacao="Falha no processamento automático: " + str(erro)
+                )
+            except Exception:
+                pass
+
+    threading.Thread(
+        target=processar_pedido_em_background,
+        args=(pedido["id"],),
+        daemon=True
+    ).start()
+
     url_publica = request.host_url.rstrip("/") + "/pedido/" + pedido["token_publico"]
     resposta = jsonify({
         "status": "recebido",
