@@ -664,7 +664,7 @@ footer{background:#111;color:#aaa;padding:30px 0}
 <div class="form-card">
 <h2>Solicitar orçamento</h2>
 <p class="section-intro">Preencha o formulário. Ao enviar, você receberá um link privado para acompanhar o pedido.</p>
-<form id="pedidoForm" onsubmit="return enviarPedido(event)">
+<form id="pedidoForm">
 <label>Nome</label><input id="nome" required maxlength="100" placeholder="Seu nome ou empresa">
 <label>E-mail</label><input id="email" type="email" maxlength="160" placeholder="voce@exemplo.com">
 <label>WhatsApp</label><input id="whatsapp" maxlength="30" placeholder="(00) 00000-0000">
@@ -684,78 +684,149 @@ footer{background:#111;color:#aaa;padding:30px 0}
 </main>
 <footer><div class="wrap">Evolia AI · Serviços digitais</div></footer>
 <script>
-async function carregarMeusPedidos(){
- const b=document.getElementById("listaMeusPedidos");if(!b)return;
- try{
-  const r=await fetch("/meus-pedidos",{credentials:"same-origin",cache:"no-store"});
-  const d=await r.json();
-  if(!r.ok){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos.</p>";return;}
-  const p=d.pedidos||[];
-  b.innerHTML=p.length?p.map(x=>"<div style=\"border:1px solid #ddd;border-radius:12px;padding:14px;margin:10px 0\"><strong>Pedido "+x.id+"</strong><p class=\"small\">Status: "+x.status_label+"</p><a class=\"btn\" href=\""+x.url+"\">Acompanhar pedido</a></div>").join(""):"<p class='small'>Nenhum pedido encontrado neste navegador.</p>";
- }catch(e){b.innerHTML="<p class='small'>Não foi possível carregar seus pedidos agora.</p>";}
-}
-async function enviarPedido(event){
- if(event) event.preventDefault();
- const box=document.getElementById("pedidoResultado");
- const botao=document.getElementById("botaoEnviarPedido");
- const form=document.getElementById("pedidoForm");
- box.className="result"; box.textContent="Enviando solicitação...";
- if(botao) botao.disabled=true;
- const contato=(document.getElementById("email").value+" "+document.getElementById("whatsapp").value+" "+document.getElementById("instagram").value).trim();
- if(!contato){box.textContent="Informe pelo menos um meio de contato.";if(botao)botao.disabled=false;return;}
- const payload={
-  nome:document.getElementById("nome").value,
-  email:document.getElementById("email").value,
-  whatsapp:document.getElementById("whatsapp").value,
-  instagram:document.getElementById("instagram").value,
-  servico:document.getElementById("servico").value,
-  descricao:document.getElementById("descricao").value,
-  modo_teste:true
- };
- try{
-  const controlador=new AbortController();
-  const temporizador=setTimeout(()=>controlador.abort(),30000);
-  const r=await fetch("/solicitar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),cache:"no-store",credentials:"same-origin",signal:controlador.signal});
-  clearTimeout(temporizador);
-  const texto=await r.text();
-  let d={}; try{d=texto?JSON.parse(texto):{};}catch(e){d={erro:texto||"Resposta inválida do servidor."};}
-  if(!r.ok){
-   box.textContent=d.erro||("Não foi possível enviar o pedido. HTTP "+r.status);
-   if(botao)botao.disabled=false;
-   return;
+(function(){
+  function byId(id){ return document.getElementById(id); }
+
+  async function carregarMeusPedidos(){
+    const box=byId("listaMeusPedidos");
+    if(!box) return;
+    try{
+      const r=await fetch("/meus-pedidos",{credentials:"same-origin",cache:"no-store"});
+      const d=await r.json();
+      if(!r.ok){
+        box.innerHTML="<p class='small'>Não foi possível carregar seus pedidos.</p>";
+        return;
+      }
+      const pedidos=d.pedidos||[];
+      box.innerHTML=pedidos.length
+        ? pedidos.map(function(x){
+            return "<div style=\"border:1px solid #ddd;border-radius:12px;padding:14px;margin:10px 0\"><strong>Pedido "+x.id+"</strong><p class=\"small\">Status: "+x.status_label+"</p><a class=\"btn\" href=\""+x.url+"\">Acompanhar pedido</a></div>";
+          }).join("")
+        : "<p class='small'>Nenhum pedido encontrado neste navegador.</p>";
+    }catch(e){
+      box.innerHTML="<p class='small'>Não foi possível carregar seus pedidos agora.</p>";
+    }
   }
-  box.innerHTML="<strong>Pedido recebido.</strong><div id='pedidoAoVivo' style='margin-top:14px;padding:14px;border:1px solid #ddd;border-radius:12px'><p class='small'>A EVOLIA iniciou o processamento...</p></div><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
-  await carregarMeusPedidos();
-  acompanharPedidoAoVivo(d.url_publica);
-  if(form) form.reset();
- }catch(e){
-  box.textContent=e.name==="AbortError"?"O servidor demorou para responder. Tente novamente.":"Erro de conexão ao enviar o pedido. Tente novamente.";
- }finally{
-  if(botao)botao.disabled=false;
- }
-}
-async function acompanharPedidoAoVivo(url){
- const box=document.getElementById("pedidoAoVivo");if(!box)return;
- const token=url.split("/pedido/")[1]||"";
- async function atualizar(){
-  try{
-   const r=await fetch("/pedido/"+encodeURIComponent(token)+"/dados",{cache:"no-store"});
-   const d=await r.json();if(!r.ok)return;
-   let h="<strong>Status:</strong> "+d.status_label;
-   if(d.proposta_publicada&&d.proposta){
-    h+="<hr><strong>Proposta disponível</strong><p>"+String(d.proposta.texto||"").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\\n/g,"<br>")+"</p>";
-    if(d.proposta.valor!=null)h+="<p><strong>Valor:</strong> R$ "+Number(d.proposta.valor).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</p>";
-    if(d.status==="proposta_enviada")h+="<p><a class='btn' href='"+url+"'>Abrir proposta e aceitar</a></p>";
-   }
-   box.innerHTML=h;
-  }catch(e){}
- }
- await atualizar();
- const antigo=window.evoliaPedidoInterval;if(antigo)clearInterval(antigo);
- window.evoliaPedidoInterval=setInterval(atualizar,5000);
-}
-carregarMeusPedidos();
-setInterval(carregarMeusPedidos,5000);
+
+  async function enviarPedido(event){
+    event.preventDefault();
+
+    const box=byId("pedidoResultado");
+    const botao=byId("botaoEnviarPedido");
+    const form=byId("pedidoForm");
+
+    if(!box || !form) return;
+
+    box.className="result";
+    box.textContent="Enviando solicitação...";
+    if(botao) botao.disabled=true;
+
+    const payload={
+      nome:byId("nome").value.trim(),
+      email:byId("email").value.trim(),
+      whatsapp:byId("whatsapp").value.trim(),
+      instagram:byId("instagram").value.trim(),
+      servico:byId("servico").value.trim(),
+      descricao:byId("descricao").value.trim(),
+      modo_teste:true
+    };
+
+    if(!payload.nome || !payload.servico || !payload.descricao){
+      box.textContent="Preencha os campos obrigatórios.";
+      if(botao) botao.disabled=false;
+      return;
+    }
+
+    if(!payload.email && !payload.whatsapp && !payload.instagram){
+      box.textContent="Informe pelo menos um meio de contato.";
+      if(botao) botao.disabled=false;
+      return;
+    }
+
+    try{
+      const controlador=new AbortController();
+      const temporizador=setTimeout(function(){controlador.abort();},30000);
+
+      const r=await fetch("/solicitar",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(payload),
+        cache:"no-store",
+        credentials:"same-origin",
+        signal:controlador.signal
+      });
+
+      clearTimeout(temporizador);
+
+      const texto=await r.text();
+      let d={};
+      try{ d=texto ? JSON.parse(texto) : {}; }
+      catch(e){ d={erro:texto||"Resposta inválida do servidor."}; }
+
+      if(!r.ok){
+        box.textContent=d.erro||("Não foi possível enviar o pedido. HTTP "+r.status);
+        if(botao) botao.disabled=false;
+        return;
+      }
+
+      box.innerHTML="<strong>Pedido recebido.</strong><div id='pedidoAoVivo' style='margin-top:14px;padding:14px;border:1px solid #ddd;border-radius:12px'><p class='small'>A EVOLIA iniciou o processamento...</p></div><p><a href='"+d.url_publica+"'>Abrir acompanhamento do pedido</a></p><p class='small'>Pedido: "+d.pedido_id+"</p>";
+
+      await carregarMeusPedidos();
+      acompanharPedidoAoVivo(d.url_publica);
+      form.reset();
+    }catch(e){
+      box.textContent=e.name==="AbortError"
+        ? "O servidor demorou para responder. Tente novamente."
+        : "Erro de conexão ao enviar o pedido. Tente novamente.";
+    }finally{
+      if(botao) botao.disabled=false;
+    }
+  }
+
+  async function acompanharPedidoAoVivo(url){
+    const box=byId("pedidoAoVivo");
+    if(!box || !url) return;
+
+    const partes=url.split("/pedido/");
+    const token=partes[1]||"";
+    if(!token) return;
+
+    async function atualizar(){
+      try{
+        const r=await fetch("/pedido/"+encodeURIComponent(token)+"/dados",{cache:"no-store"});
+        const d=await r.json();
+        if(!r.ok) return;
+
+        let h="<strong>Status:</strong> "+(d.status_label||d.status||"Processando");
+        if(d.proposta_publicada && d.proposta){
+          h+="<hr><strong>Proposta disponível</strong><p>"+String(d.proposta.texto||"").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>")+"</p>";
+          if(d.proposta.valor!=null){
+            h+="<p><strong>Valor:</strong> R$ "+Number(d.proposta.valor).toLocaleString("pt-BR",{minimumFractionDigits:2})+"</p>";
+          }
+          if(d.status==="proposta_enviada"){
+            h+="<p><a class='btn' href='"+url+"'>Abrir proposta e aceitar</a></p>";
+          }
+        }
+        box.innerHTML=h;
+      }catch(e){}
+    }
+
+    await atualizar();
+    if(window.evoliaPedidoInterval) clearInterval(window.evoliaPedidoInterval);
+    window.evoliaPedidoInterval=setInterval(atualizar,5000);
+  }
+
+  document.addEventListener("DOMContentLoaded",function(){
+    const form=byId("pedidoForm");
+    if(form){
+      form.removeAttribute("onsubmit");
+      form.addEventListener("submit",enviarPedido);
+    }
+    carregarMeusPedidos();
+    setInterval(carregarMeusPedidos,5000);
+  });
+})();
+</script>
 </script>
 </body>
 </html>
