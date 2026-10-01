@@ -817,11 +817,6 @@ footer{background:#111;color:#aaa;padding:30px 0}
   }
 
   document.addEventListener("DOMContentLoaded",function(){
-    const form=byId("pedidoForm");
-    if(form){
-      form.removeAttribute("onsubmit");
-      form.addEventListener("submit",enviarPedido);
-    }
     carregarMeusPedidos();
     setInterval(carregarMeusPedidos,5000);
   });
