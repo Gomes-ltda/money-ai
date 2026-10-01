@@ -664,14 +664,14 @@ footer{background:#111;color:#aaa;padding:30px 0}
 <div class="form-card">
 <h2>Solicitar orçamento</h2>
 <p class="section-intro">Preencha o formulário. Ao enviar, você receberá um link privado para acompanhar o pedido.</p>
-<form id="pedidoForm">
-<label>Nome</label><input id="nome" required maxlength="100" placeholder="Seu nome ou empresa">
-<label>E-mail</label><input id="email" type="email" maxlength="160" placeholder="voce@exemplo.com">
-<label>WhatsApp</label><input id="whatsapp" maxlength="30" placeholder="(00) 00000-0000">
-<label>Instagram (opcional)</label><input id="instagram" maxlength="80" placeholder="@seuusuario">
+<form id="pedidoForm" action="/solicitar" method="POST">\n<input type="hidden" name="modo_teste" value="true">
+<label>Nome</label><input id="nome" name="nome" required maxlength="100" placeholder="Seu nome ou empresa">
+<label>E-mail</label><input id="email" name="email" type="email" maxlength="160" placeholder="voce@exemplo.com">
+<label>WhatsApp</label><input id="whatsapp" name="whatsapp" maxlength="30" placeholder="(00) 00000-0000">
+<label>Instagram (opcional)</label><input id="instagram" name="instagram" maxlength="80" placeholder="@seuusuario">
 <label>O que você precisa?</label>
-<select id="servico" required><option value="">Selecione</option><option>Textos comerciais</option><option>Pesquisa e organização</option><option>Solução sob medida</option><option>Outro</option></select>
-<label>Descreva o pedido</label><textarea id="descricao" required maxlength="4000" placeholder="Explique o que você precisa e qual resultado espera."></textarea>
+<select id="servico" name="servico" required><option value="">Selecione</option><option>Textos comerciais</option><option>Pesquisa e organização</option><option>Solução sob medida</option><option>Outro</option></select>
+<label>Descreva o pedido</label><textarea id="descricao" name="descricao" required maxlength="4000" placeholder="Explique o que você precisa e qual resultado espera."></textarea>
 <p class="small">Não envie senhas, documentos sensíveis ou dados bancários pelo formulário.</p>
 <button id="botaoEnviarPedido" class="btn" type="submit">Enviar solicitação</button>
 </form>
@@ -836,7 +836,10 @@ footer{background:#111;color:#aaa;padding:30px 0}
 
 @app.route("/solicitar", methods=["POST"])
 def solicitar():
-    dados = request.get_json(silent=True) or {}
+    dados = request.get_json(silent=True)
+    veio_por_formulario = dados is None
+    if veio_por_formulario:
+        dados = request.form.to_dict()
     nome = str(dados.get("nome", "")).strip()
     email = str(dados.get("email", "")).strip()
     whatsapp = str(dados.get("whatsapp", "")).strip()
@@ -884,6 +887,9 @@ def solicitar():
     ).start()
 
     url_publica = request.host_url.rstrip("/") + "/pedido/" + pedido["token_publico"]
+    if veio_por_formulario:
+        return redirect(url_publica, code=303)
+
     resposta = jsonify({
         "status": "recebido",
         "pedido_id": pedido["id"],
